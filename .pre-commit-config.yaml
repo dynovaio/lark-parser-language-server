@@ -41,13 +41,12 @@ repos:
         entry: poetry run nbqa mypy --ignore-missing-imports
         name: nbqa-mypy
         alias: nbqa-mypy
-        exclude: ^.*\b(GraphQL)\b.*$
-        additional_dependencies: [mypy==1.16.0, types-requests==2.32.0.20250515]
+        additional_dependencies: [mypy==1.18.2]
       - id: nbqa
         entry: poetry run nbqa bandit
         name: nbqa-bandit
         alias: nbqa-bandit
-        additional_dependencies: [bandit==1.8.3]
+        additional_dependencies: [bandit==1.8.6]
       - id: nbqa-pylint
         args:
           [
@@ -96,7 +95,6 @@ repos:
     hooks:
       - id: mypy
         files: \.py$
-        additional_dependencies: [types-requests==2.32.0.20250515]
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.8.6
