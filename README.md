@@ -1,6 +1,6 @@
 [![Community-Project][dynova-banner-community]][dynova-homepage]
 
-[![PyPI - Supported versions][badge-pypi-version]][repository]
+[![PyPI - Supported versions][badge-pypi-python-versions]][repository]
 [![PyPI - Package version][badge-pypi-version]][repository]
 [![PyPI - Downloads][badge-pypi-downloads]][repository]
 [![PyPI - License][badge-pypi-license]][repository]
@@ -75,8 +75,8 @@ This project is licensed under the terms of the Apache-2.0 license. See the
 
 [dynova-homepage]: https://dynova.io
 [dynova-banner-community]: https://gitlab.com/softbutterfly/open-source/open-source-office/-/raw/master/assets/dynova/dynova-open-source--banner--community-project.png
-[badge-pypi-version]: https://img.shields.io/pypi/pyversions/lark-parser-language-server
-[badge-pypi-version]: https://img.shields.io/pypi/pyversions/lark-parser-language-server
+[badge-pypi-python-versions]: https://img.shields.io/pypi/pyversions/lark-parser-language-server
+[badge-pypi-version]: https://img.shields.io/pypi/v/lark-parser-language-server
 [badge-pypi-downloads]: https://img.shields.io/pypi/dm/lark-parser-language-server
 [badge-pypi-license]: https://img.shields.io/pypi/l/lark-parser-language-server
 
