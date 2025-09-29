@@ -10,20 +10,24 @@
 
 # Lark Parser Language Server
 
-Lark Parser Language Server is a Language Server Protocol (LSP) implementation for the Lark parsing library. It provides features such as syntax highlighting, code completion, and error checking for Lark grammar files in compatible code editors.
+Lark Parser Language Server is a Language Server Protocol (LSP) implementation
+for the Lark parsing library. It provides features such as syntax highlighting,
+code completion, and error checking for Lark grammar files in compatible code
+editors.
 
 ## ✨ Features
 
 The language server provides the following LSP features:
 
-- **Diagnostics**: Syntax error detection and undefined symbol validation
-- **Code Completion**: Intelligent suggestions for rules, terminals, and keywords
-- **Hover Information**: Documentation and type information on hover
-- **Go to Definition**: Navigate to rule and terminal definitions
-- **Find References**: Locate all usages of symbols
-- **Document Symbols**: Outline view with rules and terminals
-- **Semantic Analysis**: Advanced grammar validation
-- **Formatting**: Automatic code formatting for Lark grammar files
+* **Diagnostics**: Syntax error detection and undefined symbol validation
+* **Code Completion**: Intelligent suggestions for rules, terminals, and
+keywords
+* **Hover Information**: Documentation and type information on hover
+* **Go to Definition**: Navigate to rule and terminal definitions
+* **Find References**: Locate all usages of symbols
+* **Document Symbols**: Outline view with rules and terminals
+* **Semantic Analysis**: Advanced grammar validation
+* **Formatting**: Automatic code formatting for Lark grammar files
 
 ## Requirements
 
@@ -62,7 +66,8 @@ All changes to versions of this library are listed in our
 
 Contributions are greatly appreciated.
 
-Please fork this repository and open a pull request to make grammar tweaks, add support for other subgrammars etc.
+Please fork this repository and open a pull request to make grammar tweaks, add
+support for other subgrammars etc.
 
 ## Contributors
 
