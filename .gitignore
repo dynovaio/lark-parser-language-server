@@ -17,6 +17,7 @@
 !.shellcheckrc
 !.tox.ini
 !.travis.yml
+!.wakatime-project
 .github/copilot-instructions.md
 notebooks/**/*.py
 notebooks/**/*.csv
