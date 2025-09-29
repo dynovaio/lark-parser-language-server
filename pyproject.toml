@@ -66,7 +66,6 @@ include = [
 ]
 
 [tool.poetry.group.dev.dependencies]
-tbump = "^6.11.0"
 autopep8 = "^2.3.2"
 bandit = "^1.8.6"
 black = "^25.9.0"
@@ -88,5 +87,74 @@ pylint = "^3.3.8"
 pytest = "^8.4.2"
 pytest-cov = "^7.0.0"
 ruff = "^0.13.2"
+tbump = "^6.11.0"
 tox = "^4.30.2"
 
+[tool.black]
+target_version = ['py313']
+include = '\.pyi?$'
+exclude = '''
+/(\.git/
+  |\.eggs
+  |\.hg
+  |__pycache__
+  |\.cache
+  |\.ipynb_checkpoints
+  |\.mypy_cache
+  |\.pytest_cache
+  |\.tox
+  |\.venv
+  |_build
+  |buck-out
+  |build
+  |dist
+  |legacy
+)/
+'''
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+python_files = [
+  "**/test_*.py",
+]
+filterwarnings =[
+  "ignore::DeprecationWarning",
+  "ignore::PendingDeprecationWarning"
+]
+addopts = [
+  "--cov=lark_parser_language_server",
+  "--cov-report=xml:cobertura.xml",
+  "--cov-report=term",
+  "--import-mode=importlib",
+  "--junitxml=report.xml",
+  "--nbmake",
+]
+
+[tool.poe.tasks]
+"lint"            = "poetry run pre-commit run --all"
+"test"            = "poetry run pytest --cov lark_parser_language_server --cov-report xml:cobertura.xml --cov-report term --junitxml report.xml"
+"package:update"  = "poetry run nbdev_export"
+"package:stage"   = "git add src"
+"package:commit"  = "git commit -m 'Update: refresh src module from notebooks'"
+"version:update"  = "poetry run tbump --no-push --no-tag"
+"freeze"          = "poetry export --without-hashes --format requirements.txt --output requirements.txt"
+"freeze:dev"      = "poetry export --without-hashes --format requirements.txt --output requirements.dev.txt --with=dev"
+"docs:build"      = "poetry export jupyter-book build ."
+
+[tool.poe.tasks."package:upgrade"]
+sequence = [
+  { ref = "package:update"},
+  { ref = "lint"},
+  { ref = "package:stage" },
+  { ref = "package:commit" },
+  { cmd = "git --no-pager diff HEAD~1 HEAD -- > .diff.txt" },
+]
+ignore_fail = true
+
+[tool.poe.tasks."package:release"]
+sequence = [
+  { cmd = "git flow release start ${version}"},
+  { cmd = "poetry run tbump --no-push --no-tag --non-interactive ${version}" },
+  { cmd = "env GIT_EDITOR=: git flow release finish -m 'Release'"},
+]
+args = [{name = "version", positional = true}]
