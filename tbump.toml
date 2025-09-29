@@ -1,5 +1,5 @@
 [version]
-current = "0.7.0"
+current = "0.0.0"
 
 # Example of a semver regexp.
 # Make sure this matches current_version before
@@ -28,10 +28,6 @@ search = 'version = "{current_version}"'
 [[file]]
 src = 'pyproject.toml'
 search = 'v{current_version}'
-
-[[file]]
-src = 'settings.ini'
-search = 'version = {current_version}'
 
 [[file]]
 src = 'src/lark_parser_language_server/__init__.py'
