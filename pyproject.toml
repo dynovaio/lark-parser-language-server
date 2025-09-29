@@ -67,4 +67,26 @@ include = [
 
 [tool.poetry.group.dev.dependencies]
 tbump = "^6.11.0"
+autopep8 = "^2.3.2"
+bandit = "^1.8.6"
+black = "^25.9.0"
+coverage = "^7.10.7"
+flake8 = "^7.3.0"
+flake8-black = "^0.4.0"
+importnb = "^2023.11.1"
+isort = "^6.0.1"
+jupyter-book = "^1.0.4.post1"
+jupyterlab = "^4.4.9"
+mypy = "^1.18.2"
+nbmake = "^1.5.5"
+nbqa = {extras = ["toolchain"], version = "^1.9.1"}
+poethepoet = "^0.37.0"
+pre-commit = "^4.3.0"
+pycodestyle = "^2.14.0"
+pydocstyle = "^6.3.0"
+pylint = "^3.3.8"
+pytest = "^8.4.2"
+pytest-cov = "^7.0.0"
+ruff = "^0.13.2"
+tox = "^4.30.2"
 
