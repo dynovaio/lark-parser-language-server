@@ -5,6 +5,9 @@
 [![PyPI - Downloads][badge-pypi-downloads]][repository]
 [![PyPI - License][badge-pypi-license]][repository]
 
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/32cf38efba474a4ab376b35ddfcf5e61)](https://app.codacy.com/gh/dynovaio/lark-parser-language-server/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![pipeline status](https://gitlab.com/softbutterfly/open-source/lark-parser-language-server/badges/master/pipeline.svg)](https://gitlab.com/softbutterfly/open-source/lark-parser-language-server/-/commits/master)
+
 # Lark Parser Language Server
 
 Lark Parser Language Server is a Language Server Protocol (LSP) implementation for the Lark parsing library. It provides features such as syntax highlighting, code completion, and error checking for Lark grammar files in compatible code editors.
@@ -71,12 +74,13 @@ This project is licensed under the terms of the Apache-2.0 license. See the
 [LICENSE ↗][license] file.
 
 [dynova-homepage]: https://dynova.io
-[repository]: https://github.com/dynovaio/lark-parser-vscode
 [dynova-banner-community]: https://gitlab.com/softbutterfly/open-source/open-source-office/-/raw/master/assets/dynova/dynova-open-source--banner--community-project.png
 [badge-pypi-version]: https://img.shields.io/pypi/pyversions/lark-parser-language-server
 [badge-pypi-version]: https://img.shields.io/pypi/pyversions/lark-parser-language-server
 [badge-pypi-downloads]: https://img.shields.io/pypi/dm/lark-parser-language-server
 [badge-pypi-license]: https://img.shields.io/pypi/l/lark-parser-language-server
+
+[repository]: https://github.com/dynovaio/lark-parser-vscode
 [docs]: https://dynovaio.github.io/lark-parser-language-server
 [changelog]: https://github.com/dynovaio/lark-parser-language-server/blob/develop/CHANGELOG.md
 [contributors]: https://github.com/dynovaio/lark-parser-language-server/graphs/contributors
