@@ -11,7 +11,7 @@ Clone the project
 
 ```bash
 git clone https://github.com/dynovaio/lark-parser-language-server.git
-cd pygments-sb-nrql
+cd lark-parser-language-server
 ```
 
 Install the rquited python versions
@@ -33,7 +33,7 @@ You can run the tests with poetry
 
 ```bash
 poetry run pytest \
-    --cov pygments_sb_nrql \
+    --cov lark_parser_language_server \
     --cov-report xml:cobertura.xml \
     --cov-report term  \
     --junitxml report.xml
