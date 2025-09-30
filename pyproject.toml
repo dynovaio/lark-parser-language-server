@@ -126,15 +126,15 @@ filterwarnings =[
 addopts = [
   "--verbose",
   "--cov=lark_parser_language_server",
-  "--cov-report=xml:.coverage.xml",
-  "--cov-report=html:.htmlcov",
+  "--cov-report=xml:cobertura.xml",
+  "--cov-report=html:htmlcov",
   "--cov-report=term",
   "--cov-report=term-missing",
   "--cov-branch",
   "--cov-fail-under=95",
   "--tb=short",
   "--import-mode=importlib",
-  "--junitxml=.report.xml",
+  "--junitxml=report.xml",
   "--nbmake",
 ]
 

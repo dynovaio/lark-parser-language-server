@@ -46,3 +46,4 @@ Makefile
 _build
 docs
 WARP.md
+htmlcov
