@@ -1803,6 +1803,22 @@ test = ["coverage", "pytest (>=7.0)", "pytest-check-links (>=0.7)", "pytest-cons
 upgrade-extension = ["copier (>=9,<10)", "jinja2-time (<0.3)", "pydantic (<3.0)", "pyyaml-include (<3.0)", "tomli-w (<2.0)"]
 
 [[package]]
+name = "jupyterlab-lsp"
+version = "5.2.0"
+description = "Coding assistance for JupyterLab with Language Server Protocol"
+optional = false
+python-versions = ">=3.8"
+groups = ["dev"]
+files = [
+    {file = "jupyterlab_lsp-5.2.0-py3-none-any.whl", hash = "sha256:fe4ec7e3479fc8c4fc01ac3c7cf08c8b5d2332ffbe487b9eab0cf9e6eead267d"},
+    {file = "jupyterlab_lsp-5.2.0.tar.gz", hash = "sha256:63684885b35c1dc9d83e54b4b06380c9375ad7d751a2975649b357308c8d30b9"},
+]
+
+[package.dependencies]
+jupyter_lsp = ">=2.0.0"
+jupyterlab = ">=4.1.0,<5.0.0a0"
+
+[[package]]
 name = "jupyterlab-pygments"
 version = "0.3.0"
 description = "Pygments theme using JupyterLab CSS variables"
@@ -4580,4 +4596,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9.0,<4.0.0"
-content-hash = "160d7adf50e4e96d34ce44054c0f0cac7d68823b326497174d6e48321aaf966e"
+content-hash = "932cd46560f2644bc4b9d087e7da90b2f47789bdf5a21b3545cfd729710b84fb"

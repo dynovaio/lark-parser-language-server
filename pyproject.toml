@@ -76,6 +76,7 @@ importnb = "^2023.11.1"
 isort = "^6.0.1"
 jupyter-book = "^1.0.4.post1"
 jupyterlab = "^4.4.9"
+jupyterlab-lsp = "^5.2.0"
 mypy = "^1.18.2"
 nbmake = "^1.5.5"
 nbqa = {extras = ["toolchain"], version = "^1.9.1"}
