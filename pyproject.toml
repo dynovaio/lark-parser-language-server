@@ -1,19 +1,222 @@
 [project]
 name = "lark-parser-language-server"
-version = "0.0.0"
+version = "0.1.0"
 description = "Lark Parser Language Server."
 authors = [
-    {name = "Dynova Development Team", email = "dev@dynova.io"},
-    {name = "zodiacfireworks", email = "martin.vuelta@gmail.com"}
+  { name = "Dynova Development Team", email = "dev@dynova.io" },
+  { name = "zodiacfireworks", email = "martin.vuelta@gmail.com" }
 ]
-readme = "README.md"
-requires-python = "3.13.7"
+maintainers = [
+  { name = "zodiacfireworks", email = "martin.vuelta@gmail.com" }
+]
+readme = { file = "README.md", content-type = "text/markdown" }
+license = "Apache-2.0"
+license-files = ["LICENSE.txt"]
+keywords = [
+  "Dynova",
+  "lark",
+  "lark parser",
+  "lsp",
+  "language-server",
+  "language-server-protocol"
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Interpreters",
+  "Topic :: Software Development :: Code Generators",
+  "Topic :: Text Editors :: Integrated Development Environments (IDE)",
+  "Topic :: Software Development",
+  "Topic :: System",
+  "Topic :: Utilities",
+  "Typing :: Typed"
+]
+requires-python = ">=3.9.0,<4.0.0"
 dependencies = [
-    "pygls (>=1.3.1,<2.0.0)",
-    "lark (>=1.3.0,<2.0.0)"
+  "pygls (>=1.3.1,<2.0.0)",
+  "lark (>=1.3.0,<2.0.0)"
 ]
 
+[project.urls]
+Homepage = "https://github.com/dynovaio/lark-parser-language-server"
+Repository = "https://github.com/dynovaio/lark-parser-language-server"
+Documentation = "https://dynovaio.github.io/lark-parser-language-server"
+Issues = "https://github.com/dynovaio/lark-parser-language-server/issues"
+Download = "https://github.com/dynovaio/lark-parser-language-server/archive/refs/tags/v0.1.0.zip"
+Changelog = "https://github.com/dynovaio/lark-parser-language-server/blob/master/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/dynovaio/lark-parser-language-server/issues"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = true
+packages = [
+    { include = "lark_parser_language_server", from = "src" },
+]
+include = [
+  "LICENSE.txt",
+  "CHANGELOG.md",
+]
+
+[tool.poetry.group.dev.dependencies]
+autopep8 = "^2.3.2"
+bandit = "^1.8.6"
+black = "^25.9.0"
+coverage = "^7.10.7"
+flake8 = "^7.3.0"
+flake8-black = "^0.4.0"
+importnb = "^2023.11.1"
+isort = "^6.0.1"
+jupyter-book = "^1.0.4.post1"
+jupyterlab = "^4.4.9"
+mypy = "^1.18.2"
+nbmake = "^1.5.5"
+nbqa = {extras = ["toolchain"], version = "^1.9.1"}
+poethepoet = "^0.37.0"
+pre-commit = "^4.3.0"
+pycodestyle = "^2.14.0"
+pydocstyle = "^6.3.0"
+pylint = "^3.3.8"
+pytest = "^8.4.2"
+pytest-cov = "^7.0.0"
+pytest-lsp = "^0.4.3"
+pytest-mock = "^3.15.1"
+ruff = "^0.13.2"
+tbump = "^6.11.0"
+tox = "^4.30.2"
+
+[tool.black]
+target_version = ['py313']
+include = '\.pyi?$'
+exclude = '''
+/(\.git/
+  |\.eggs
+  |\.hg
+  |__pycache__
+  |\.cache
+  |\.ipynb_checkpoints
+  |\.mypy_cache
+  |\.pytest_cache
+  |\.tox
+  |\.venv
+  |_build
+  |buck-out
+  |build
+  |dist
+  |legacy
+)/
+'''
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+python_files = [
+  "**/test_*.py",
+]
+filterwarnings =[
+  "ignore::DeprecationWarning",
+  "ignore::PendingDeprecationWarning"
+]
+addopts = [
+  "--verbose",
+  "--cov=lark_parser_language_server",
+  "--cov-report=xml:cobertura.xml",
+  "--cov-report=html:htmlcov",
+  "--cov-report=term",
+  "--cov-report=term-missing",
+  "--cov-branch",
+  "--cov-fail-under=95",
+  "--tb=short",
+  "--import-mode=importlib",
+  "--junitxml=report.xml",
+  "--nbmake",
+]
+
+[tool.poe.tasks]
+"lint"            = "poetry run pre-commit run --all"
+"test"            = "poetry run pytest"
+"test:coverage"   = "poetry run coverage report -m"
+"package:update"  = "poetry run nbdev_export"
+"package:stage"   = "git add src"
+"package:commit"  = "git commit -m 'Update: refresh src module from notebooks'"
+"version:update"  = "poetry run tbump --no-push --no-tag"
+"freeze"          = "poetry export --without-hashes --format requirements.txt --output requirements.txt"
+"freeze:dev"      = "poetry export --without-hashes --format requirements.txt --output requirements.dev.txt --with=dev"
+"docs:build"      = "poetry export jupyter-book build ."
+
+[tool.poe.tasks."package:upgrade"]
+sequence = [
+  { ref = "package:update"},
+  { ref = "lint"},
+  { ref = "package:stage" },
+  { ref = "package:commit" },
+  { cmd = "git --no-pager diff HEAD~1 HEAD -- > .diff.txt" },
+]
+ignore_fail = true
+
+[tool.poe.tasks."package:release"]
+sequence = [
+  { cmd = "git flow release start ${version}"},
+  { cmd = "poetry run tbump --no-push --no-tag --non-interactive ${version}" },
+  { cmd = "env GIT_EDITOR=: git flow release finish -m 'Release'"},
+]
+args = [{name = "version", positional = true}]
+
+[tool.mypy]
+strict_optional = "True"
+mypy_path = [
+  "src",
+  "src/lark_parser_language_server",
+]
+
+[tool.coverage.run]
+branch = 1
+omit = [
+  "*/management/*",
+  "*/migrations/*",
+  "*/tests/*",
+]
+source = "src"
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "if __name__\\s*==\\s*['\"]__main__['\"]\\s*:"
+]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+filter_files = true
+multi_line_output = 3
+include_trailing_comma = true
+
+src_paths = [
+  "src"
+]
+
+skip = [
+  ".direnv",
+  ".tox",
+  ".venv",
+  "migrations",
+  "node_modules"
+]
+
+skip_glob = [
+  "tests",
+  "tests/.*.py",
+  "tests_*.py"
+]
+
+known_first_party = ["lark_parser_language_server"]
+known_third_party = ["lark", "lsprotocol", "pygls", "pytest"]

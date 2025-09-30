@@ -9,14 +9,14 @@
 !.gitignore
 !.gitlab-ci.yml
 !.isort.cfg
-!.mdlrc
-!.mdlrc.rb
+!.markdownlint.json
 !.pre-commit-config.yaml
 !.pylintrc*
 !.python-version
 !.shellcheckrc
 !.tox.ini
 !.travis.yml
+!.wakatime-project
 .github/copilot-instructions.md
 notebooks/**/*.py
 notebooks/**/*.csv
@@ -46,3 +46,4 @@ Makefile
 _build
 docs
 WARP.md
+htmlcov
