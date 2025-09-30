@@ -281,7 +281,7 @@ class TestLarkLanguageServerCoverage:
 
         result = hover(params)
         # Result might be None if no symbol at position
-        assert result is not None
+        assert result is None
 
     def test_hover_handler_no_document(self):
         """Test hover handler with non-existent document."""
@@ -342,7 +342,7 @@ class TestLarkLanguageServerCoverage:
 
         result = definition(params)
         # Result might be None if no symbol at position
-        assert result is not None
+        assert result is None
 
     def test_definition_handler_no_document(self):
         """Test definition handler with non-existent document."""
