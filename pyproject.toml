@@ -1,6 +1,6 @@
 [project]
 name = "lark-parser-language-server"
-version = "0.0.0"
+version = "0.1.0"
 description = "Lark Parser Language Server."
 authors = [
   { name = "Dynova Development Team", email = "dev@dynova.io" },
@@ -47,7 +47,7 @@ Homepage = "https://github.com/dynovaio/lark-parser-language-server"
 Repository = "https://github.com/dynovaio/lark-parser-language-server"
 Documentation = "https://dynovaio.github.io/lark-parser-language-server"
 Issues = "https://github.com/dynovaio/lark-parser-language-server/issues"
-Download = "https://github.com/dynovaio/lark-parser-language-server/archive/refs/tags/v0.0.0.zip"
+Download = "https://github.com/dynovaio/lark-parser-language-server/archive/refs/tags/v0.1.0.zip"
 Changelog = "https://github.com/dynovaio/lark-parser-language-server/blob/master/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/dynovaio/lark-parser-language-server/issues"
 
