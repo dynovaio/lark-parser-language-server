@@ -61,11 +61,16 @@ repos:
     rev: v2.2.0
     hooks:
       - id: seed-isort-config
+        additional_dependencies: ["isort[toml]"]
+        args: [--settings-path, .]
+        files: ^src/.*\.py$
 
   - repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.10.1
     hooks:
       - id: isort
+        additional_dependencies: ["isort[toml]"]
+        args: [--settings-path, ., --skip-glob, tests/.*.py]
 
   - repo: https://github.com/ambv/black
     rev: 25.9.0

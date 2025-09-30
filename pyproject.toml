@@ -178,15 +178,43 @@ mypy_path = [
 [tool.coverage.run]
 branch = 1
 omit = [
-    "*/management/*",
-    "*/migrations/*",
-    "*/test_*.py",
+  "*/management/*",
+  "*/migrations/*",
+  "*/tests/*",
 ]
 source = "src"
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
-    "raise AssertionError",
-    "raise NotImplementedError",
+  "pragma: no cover",
+  "raise AssertionError",
+  "raise NotImplementedError",
 ]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+filter_files = true
+multi_line_output = 3
+include_trailing_comma = true
+
+src_paths = [
+  "src"
+]
+
+skip = [
+  ".direnv",
+  ".tox",
+  ".venv",
+  "migrations",
+  "node_modules"
+]
+
+skip_glob = [
+  "tests",
+  "tests/.*.py",
+  "tests_*.py"
+]
+
+known_first_party = ["lark_parser_language_server"]
+known_third_party = ["lark", "lsprotocol", "pygls", "pytest"]
