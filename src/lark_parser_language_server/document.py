@@ -248,32 +248,33 @@ class LarkDocument:
         self, line: int, col: int
     ) -> List[CompletionItem]:
         """Get completion suggestions at the given position."""
-        completions = []
-
-        # Add all defined rules
-        for rule_name in self._rules:
-            completions.append(
-                CompletionItem(
-                    label=rule_name,
-                    kind=CompletionItemKind.Function,
-                    detail="Rule",
-                    documentation=f"Grammar rule: {rule_name}",
-                )
+        completions = [
+            CompletionItem(
+                label=symbol.name,
+                kind=(
+                    CompletionItemKind.Function
+                    if symbol.is_rule
+                    else CompletionItemKind.Variable
+                ),
+                detail=symbol.kind.capitalize(),
+                documentation=(
+                    f"Grammar rule: {symbol.name}"
+                    if symbol.is_rule
+                    else f"Grammar terminal: {symbol.name}"
+                ),
             )
-
-        # Add all defined terminals
-        for terminal_name in self._terminals:
-            completions.append(
-                CompletionItem(
-                    label=terminal_name,
-                    kind=CompletionItemKind.Constant,
-                    detail="Terminal",
-                    documentation=f"Terminal symbol: {terminal_name}",
-                )
-            )
+            for symbol in self._symbol_table.symbols.values()
+        ]
 
         # Add Lark keywords and operators
-        keywords = ["start", "import", "ignore", "override", "extend", "declare"]
+        keywords = [
+            "start",
+            "import",
+            "ignore",
+            "override",
+            "extend",
+            "declare",
+        ]
         for keyword in keywords:
             completions.append(
                 CompletionItem(
