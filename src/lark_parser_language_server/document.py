@@ -203,26 +203,13 @@ class LarkDocument:
 
         return line_text[start:end]
 
-    def get_definition_location(self, symbol: str) -> Optional[Location]:
+    def get_definition_location(self, symbol_name: str) -> Optional[Location]:
         """Get the definition location of a symbol."""
-        if symbol in self._rules:
-            line, col = self._rules[symbol]
+        if symbol_name in self._symbol_table.symbols:
+            symbol = self._symbol_table.symbols[symbol_name]
             return Location(
                 uri=self.uri,
-                range=Range(
-                    start=Position(line=line, character=col),
-                    end=Position(line=line, character=col + len(symbol)),
-                ),
-            )
-
-        if symbol in self._terminals:
-            line, col = self._terminals[symbol]
-            return Location(
-                uri=self.uri,
-                range=Range(
-                    start=Position(line=line, character=col),
-                    end=Position(line=line, character=col + len(symbol)),
-                ),
+                range=symbol.range.to_lsp_range(),
             )
 
         return None
