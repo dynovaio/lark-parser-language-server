@@ -27,9 +27,10 @@ from lsprotocol.types import (
 )
 from tests.fixtures import SIMPLE_GRAMMAR, VALID_GRAMMAR
 
+from lark_parser_language_server import __version__
 from lark_parser_language_server.document import LarkDocument
 from lark_parser_language_server.server import LarkLanguageServer
-from lark_parser_language_server.version import __version__
+from lark_parser_language_server.version import VERSION
 
 
 class TestLarkLanguageServer:
@@ -598,7 +599,7 @@ class TestLarkLanguageServer:
     def test_server_name_and_version(self):
         """Test server name and version properties."""
         assert self.server.name == "lark-parser-language-server"
-        assert self.server.version == "0.1.0"
+        assert self.server.version == ".".join(VERSION)
 
         # Test that version matches what's in version.py
         assert self.server.version == __version__

@@ -25,8 +25,8 @@ from lsprotocol.types import (
 )
 from pygls.server import LanguageServer
 
-from .document import LarkDocument
-from .version import __version__
+from lark_parser_language_server import __version__
+from lark_parser_language_server.document import LarkDocument
 
 logger = logging.getLogger(__name__)
 

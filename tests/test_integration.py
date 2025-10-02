@@ -1,9 +1,9 @@
 """Integration tests for LarkLanguageServer."""
 
+from tests.fixtures import INVALID_GRAMMAR, SIMPLE_GRAMMAR, VALID_GRAMMAR
+
 from lark_parser_language_server.document import LarkDocument
 from lark_parser_language_server.server import LarkLanguageServer
-
-from .fixtures import INVALID_GRAMMAR, SIMPLE_GRAMMAR, VALID_GRAMMAR
 
 
 class TestLarkLanguageServerIntegration:

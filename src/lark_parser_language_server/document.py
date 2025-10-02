@@ -16,7 +16,7 @@ from lsprotocol.types import (
     Range,
 )
 
-from .symbol_table import Symbol, SymbolTable
+from lark_parser_language_server.symbol_table import Symbol, SymbolTable
 
 logger = logging.getLogger(__name__)
 
