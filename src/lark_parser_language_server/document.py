@@ -210,28 +210,28 @@ class LarkDocument:
 
     def get_definition_location(self, symbol_name: str) -> Optional[Location]:
         """Get the definition location of a symbol."""
-        if symbol_name in self._symbol_table.symbols:
-            symbol = self._symbol_table.symbols[symbol_name]
-            return Location(
-                uri=self.uri,
-                range=symbol.range.to_lsp_range(),
-            )
+        if symbol_name not in self._symbol_table.symbols:
+            return None
 
-        return None
+        symbol = self._symbol_table.symbols[symbol_name]
+
+        return Location(
+            uri=self.uri,
+            range=symbol.range.to_lsp_range(),
+        )
 
     def get_references(self, symbol_name: str) -> List[Location]:
         """Get all reference locations of a symbol."""
-        locations = []
-        if symbol_name in self._references:
-            for symbol in self._references[symbol_name]:
-                locations.append(
-                    Location(
-                        uri=self.uri,
-                        range=symbol.range.to_lsp_range(),
-                    )
-                )
+        if symbol_name not in self._references:
+            return []
 
-        return locations
+        return [
+            Location(
+                uri=self.uri,
+                range=symbol.range.to_lsp_range(),
+            )
+            for symbol in self._references[symbol_name]
+        ]
 
     def get_document_symbols(self) -> List[DocumentSymbol]:
         """Get document symbols for outline view."""
