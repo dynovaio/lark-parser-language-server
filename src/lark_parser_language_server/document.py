@@ -28,9 +28,6 @@ class LarkDocument:
         self.lines = source.splitlines()
         self._symbol_table = SymbolTable()
         self._parsed_tree: Optional[Tree] = None
-        self._rules: Dict[str, Tuple[int, int]] = {}  # name -> (line, column)
-        self._terminals: Dict[str, Tuple[int, int]] = {}  # name -> (line, column)
-        self._imports: Dict[str, Tuple[int, int]] = {}  # name -> (line, column)
         self._references: Dict[str, List[Symbol]] = {}  # name -> [(line, col), ...]
         self._diagnostics: List[Diagnostic] = []
         self._analyze()
