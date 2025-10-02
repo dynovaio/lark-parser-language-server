@@ -1,6 +1,6 @@
 [project]
 name = "lark-parser-language-server"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lark Parser Language Server."
 authors = [
   { name = "Dynova Development Team", email = "dev@dynova.io" },
@@ -26,7 +26,11 @@ classifiers = [
   "Intended Audience :: Information Technology",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: Apache Software License",
-  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Interpreters",
   "Topic :: Software Development :: Code Generators",
@@ -47,7 +51,7 @@ Homepage = "https://github.com/dynovaio/lark-parser-language-server"
 Repository = "https://github.com/dynovaio/lark-parser-language-server"
 Documentation = "https://dynovaio.github.io/lark-parser-language-server"
 Issues = "https://github.com/dynovaio/lark-parser-language-server/issues"
-Download = "https://github.com/dynovaio/lark-parser-language-server/archive/refs/tags/v0.1.0.zip"
+Download = "https://github.com/dynovaio/lark-parser-language-server/archive/refs/tags/v0.2.0.zip"
 Changelog = "https://github.com/dynovaio/lark-parser-language-server/blob/master/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/dynovaio/lark-parser-language-server/issues"
 
@@ -70,12 +74,15 @@ autopep8 = "^2.3.2"
 bandit = "^1.8.6"
 black = "^25.9.0"
 coverage = "^7.10.7"
+debugpy = "^1.8.17"
 flake8 = "^7.3.0"
 flake8-black = "^0.4.0"
 importnb = "^2023.11.1"
 isort = "^6.0.1"
 jupyter-book = "^1.0.4.post1"
+jupyter-lsp = "^2.3.0"
 jupyterlab = "^4.4.9"
+jupyterlab-lsp = "^5.2.0"
 mypy = "^1.18.2"
 nbmake = "^1.5.5"
 nbqa = {extras = ["toolchain"], version = "^1.9.1"}
