@@ -29,10 +29,6 @@ search = 'version = "{current_version}"'
 src = 'pyproject.toml'
 search = 'v{current_version}'
 
-[[file]]
-src = 'src/lark_parser_language_server/__init__.py'
-search = '__version__ = "{current_version}"'
-
 [[before_commit]]
 name = "Update version.py"
 cmd = "echo $(echo \"{new_version}\" | sed -r 's/([0-9]+)\\.([0-9]+)\\.([0-9]+)/VERSION = (\"\\1\", \"\\2\", \"\\3\")/g') > src/lark_parser_language_server/version.py"

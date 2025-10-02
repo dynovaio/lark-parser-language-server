@@ -47,7 +47,7 @@ class TestLarkLanguageServer:
     def test_server_initialization(self):
         """Test server initialization."""
         assert self.server.name == "lark-parser-language-server"
-        assert self.server.version == "0.1.0"
+        assert self.server.version == __version__
         assert isinstance(self.server.documents, dict)
         assert len(self.server.documents) == 0
 
@@ -142,7 +142,7 @@ class TestLarkLanguageServer:
         # The fact that the server initializes without error indicates features were set up
         server = LarkLanguageServer()
         assert server.name == "lark-parser-language-server"
-        assert server.version == "0.1.0"
+        assert server.version == __version__
         assert hasattr(server, "documents")
 
     def test_document_operations_workflow(self, mocker):
