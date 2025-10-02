@@ -147,14 +147,10 @@ class LarkDocument:
         for symbol_name in referenced_symbols:
             if symbol_name not in defined_symbols:
                 for symbol in self._references[symbol_name]:
-                    kind = symbol.kind
-                    if symbol.is_unknown:
-                        kind = "unknown symbol"
-
                     self._add_diagnostic(
                         symbol.position.line,
                         symbol.position.column,
-                        f"Undefined {kind} '{symbol_name}'",
+                        f"Undefined {symbol.kind} '{symbol.name}'",
                         DiagnosticSeverity.Error,
                     )
 
@@ -186,23 +182,25 @@ class LarkDocument:
         """Get all diagnostics for this document."""
         return self._diagnostics
 
-    def get_symbol_at_position(self, line: int, col: int) -> Optional[str]:
+    def get_symbol_at_position(
+        self, line: int, column: int
+    ) -> Optional[Tuple[str, int, int]]:
         """Get the symbol at the given position."""
         if line >= len(self.lines):
             return None
 
         line_text = self.lines[line]
-        if col >= len(line_text):
+        if column >= len(line_text):
             return None
 
         # Find word boundaries
-        start = col
+        start = column
         while start > 0 and (
             line_text[start - 1].isalnum() or line_text[start - 1] == "_"
         ):
             start -= 1
 
-        end = col
+        end = column
         while end < len(line_text) and (
             line_text[end].isalnum() or line_text[end] == "_"
         ):
@@ -211,7 +209,7 @@ class LarkDocument:
         if start == end:
             return None
 
-        return line_text[start:end]
+        return (line_text[start:end], start, end)
 
     def get_definition_location(self, symbol_name: str) -> Optional[Location]:
         """Get the definition location of a symbol."""
@@ -287,24 +285,27 @@ class LarkDocument:
 
         return completions
 
-    def get_hover_info(self, line: int, col: int) -> Optional[Hover]:
+    def get_hover_info(self, line: int, column: int) -> Optional[Hover]:
         """Get hover information for the symbol at the given position."""
-        symbol = self.get_symbol_at_position(line, col)
-        if not symbol:
+        symbol_info = self.get_symbol_at_position(line, column)
+
+        if symbol_info is None:
             return None
 
-        content = ""
-        if symbol in self._rules:
-            content = f"**Rule:** `{symbol}`\n\nA grammar rule definition."
-        elif symbol in self._terminals:
-            content = f"**Terminal:** `{symbol}`\n\nA terminal symbol definition."
-        else:
+        symbol_name, start_column, end_column = symbol_info
+
+        symbol = self._symbol_table.symbols.get(symbol_name, None)
+
+        if symbol is None:
             return None
 
         return Hover(
-            contents=MarkupContent(kind=MarkupKind.Markdown, value=content),
+            contents=MarkupContent(
+                kind=MarkupKind.Markdown,
+                value=symbol.documentation,
+            ),
             range=Range(
-                start=Position(line=line, character=col),
-                end=Position(line=line, character=col + len(symbol)),
+                start=Position(line=line, character=start_column),
+                end=Position(line=line, character=end_column),
             ),
         )

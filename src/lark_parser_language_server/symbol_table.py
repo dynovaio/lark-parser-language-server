@@ -2,6 +2,7 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Flag, auto
+from textwrap import dedent
 from typing import Dict, List, Optional
 
 from lark import Token, Tree
@@ -127,6 +128,27 @@ class Symbol:
             f"directive={self._directive})"
         )
 
+    @property
+    def documentation(self) -> str:
+        tag_line = (
+            "Grammar rule definition."
+            if self.is_rule
+            else "Terminal symbol definition."
+        )
+        content = dedent(
+            f"""
+            ```lark
+            {self.name}
+            ```
+
+            ---
+
+            {tag_line}
+            """
+        )
+
+        return content
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Symbol):
             return NotImplemented
@@ -176,7 +198,7 @@ class Symbol:
         if self.name.islower():
             return "rule"
 
-        return "unknown"
+        raise ValueError(f"Invalid symbol name: {self.name}")
 
     @property
     def is_terminal(self) -> bool:
@@ -185,10 +207,6 @@ class Symbol:
     @property
     def is_rule(self) -> bool:
         return self.kind == "rule"
-
-    @property
-    def is_unknown(self) -> bool:
-        return self.kind == "unknown"
 
     @property
     def is_inlined(self) -> bool:
