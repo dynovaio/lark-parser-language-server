@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-10-02
+
 ### Major Refactoring & Architecture Improvements
 
 * **Code Organization & Architecture**
