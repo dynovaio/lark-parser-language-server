@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, List, Optional, Tuple
 
-from lark import Lark, LarkError, Tree
+from lark import Lark, LarkError, Token, Tree
 from lark.exceptions import (
     ParseError,
     UnexpectedCharacters,
@@ -22,7 +22,7 @@ from lsprotocol.types import (
     Range,
 )
 
-from .symbol_table import SymbolTable
+from .symbol_table import Symbol, SymbolTable
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +37,7 @@ class LarkDocument:
         self._rules: Dict[str, Tuple[int, int]] = {}  # name -> (line, column)
         self._terminals: Dict[str, Tuple[int, int]] = {}  # name -> (line, column)
         self._imports: Dict[str, Tuple[int, int]] = {}  # name -> (line, column)
-        self._references: Dict[str, List[Tuple[int, int]]] = (
-            {}
-        )  # name -> [(line, col), ...]
+        self._references: Dict[str, List[Symbol]] = {}  # name -> [(line, col), ...]
         self._diagnostics: List[Diagnostic] = []
         self._analyze()
 
@@ -94,59 +92,71 @@ class LarkDocument:
 
     def _find_references(self) -> None:
         """Find all references to rules and terminals."""
-        # for line_num, line in enumerate(self.lines):
-        #     # Find rule references (lowercase identifiers)
-        #     for match in re.finditer(r"\b([a-z_][a-z0-9_]*)\b", line):
-        #         name = match.group(1)
-        #         if name in self._rules:
-        #             if name not in self._references:
-        #                 self._references[name] = []
-        #             self._references[name].append((line_num, match.start()))
+        if self._parsed_tree:
+            symbols = [
+                Symbol(token)
+                for token in list(
+                    self._parsed_tree.scan_values(
+                        lambda v: isinstance(v, Token) and v.type in ("RULE", "TOKEN")
+                    )
+                )
+            ]
 
-        #     # Find terminal references (uppercase identifiers)
-        #     for match in re.finditer(r"\b([A-Z_][A-Z0-9_]*)\b", line):
-        #         name = match.group(1)
-        #         if name in self._terminals:
-        #             if name not in self._references:
-        #                 self._references[name] = []
-        #             self._references[name].append((line_num, match.start()))
+            import_path_symbols = [
+                symbol
+                for import_statement in self._parsed_tree.find_pred(
+                    lambda t: t.data in ("import", "multi_import")
+                )
+                for symbol in self._extract_symbols_from_import_path(import_statement)
+            ]
+
+            for symbol in symbols:
+                if symbol in import_path_symbols:
+                    continue
+
+                if symbol.name not in self._references:
+                    self._references[symbol.name] = []
+
+                self._references[symbol.name].append(symbol)
+
+    def _extract_symbols_from_import_path(self, tree: Tree) -> list[Symbol]:
+        if tree.data not in ("import", "multi_import"):
+            return []
+
+        import_path, alias = tree.children
+
+        if tree.data == "multi_import":
+            alias = None
+
+        import_path_tokens = list(
+            import_path.scan_values(
+                lambda v: isinstance(v, Token) and v.type in ("RULE", "TOKEN")
+            )
+        )
+
+        if alias is None:
+            import_path_tokens = import_path_tokens[:-1]
+
+        return [Symbol(token) for token in import_path_tokens]
 
     def _validate_references(self) -> None:
         """Validate that all referenced symbols are defined."""
-        # defined_symbols = set(self._rules.keys()) | set(self._terminals.keys())
+        defined_symbols = self._symbol_table.symbols.keys()
+        referenced_symbols = self._references.keys()
 
-        # for line_num, line in enumerate(self.lines):
-        #     # Check rule references
-        #     for match in re.finditer(r"\b([a-z_][a-z0-9_]*)\b", line):
-        #         name = match.group(1)
-        #         # Skip keywords and common words
-        #         if name in [
-        #             "start",
-        #             "import",
-        #             "ignore",
-        #             "override",
-        #             "extend",
-        #             "declare",
-        #         ]:
-        #             continue
-        #         if name not in defined_symbols:
-        #             self._add_diagnostic(
-        #                 line_num,
-        #                 match.start(),
-        #                 f"Undefined rule '{name}'",
-        #                 DiagnosticSeverity.Error,
-        #             )
+        for symbol_name in referenced_symbols:
+            if symbol_name not in defined_symbols:
+                for symbol in self._references[symbol_name]:
+                    kind = symbol.kind
+                    if symbol.is_unknown:
+                        kind = "unknown symbol"
 
-        #     # Check terminal references
-        #     for match in re.finditer(r"\b([A-Z_][A-Z0-9_]*)\b", line):
-        #         name = match.group(1)
-        #         if name not in defined_symbols:
-        #             self._add_diagnostic(
-        #                 line_num,
-        #                 match.start(),
-        #                 f"Undefined terminal '{name}'",
-        #                 DiagnosticSeverity.Error,
-        #             )
+                    self._add_diagnostic(
+                        symbol.position.line,
+                        symbol.position.column,
+                        f"Undefined {kind} '{symbol_name}'",
+                        DiagnosticSeverity.Error,
+                    )
 
     def _add_diagnostic(
         self, line: int, col: int, message: str, severity: DiagnosticSeverity
@@ -214,18 +224,15 @@ class LarkDocument:
 
         return None
 
-    def get_references(self, symbol: str) -> List[Location]:
+    def get_references(self, symbol_name: str) -> List[Location]:
         """Get all reference locations of a symbol."""
         locations = []
-        if symbol in self._references:
-            for line, col in self._references[symbol]:
+        if symbol_name in self._references:
+            for symbol in self._references[symbol_name]:
                 locations.append(
                     Location(
                         uri=self.uri,
-                        range=Range(
-                            start=Position(line=line, character=col),
-                            end=Position(line=line, character=col + len(symbol)),
-                        ),
+                        range=symbol.range.to_lsp_range(),
                     )
                 )
 

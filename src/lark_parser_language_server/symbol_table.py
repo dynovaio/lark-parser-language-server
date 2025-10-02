@@ -119,6 +119,14 @@ class Symbol:
         self._directive = directive
         self._process_token()
 
+    def __repr__(self) -> str:
+        return (
+            f"Symbol(name={self.name!r}, position={self.position}, "
+            f"range={self.range}, select_range={self.select_range}, "
+            f"modifiers={self.modifiers}, alias={self._alias}, "
+            f"directive={self._directive})"
+        )
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Symbol):
             return NotImplemented
@@ -245,6 +253,16 @@ class SymbolTable(Visitor):
         self.symbols = {}
         self.references = {}
 
+    def __default__(self, tree: Tree):
+        if tree.data == "import":
+            self._handle_import(tree)
+
+        if tree.data == "multi_import":
+            self._handle_multi_import(tree)
+
+        if tree.data == "declare":
+            self._handle_declare(tree)
+
     def rule(self, tree: Tree):
         rule = tree.children[0]
         self._consume_symbol(tree, rule)
@@ -257,16 +275,6 @@ class SymbolTable(Visitor):
         alias = tree.children[-1]
         if alias:
             self._consume_symbol(tree, alias)
-
-    def __default__(self, tree: Tree):
-        if tree.data == "import":
-            self._handle_import(tree)
-
-        if tree.data == "multi_import":
-            self._handle_multi_import(tree)
-
-        if tree.data == "declare":
-            self._handle_declare(tree)
 
     def _handle_import(self, tree: Tree):
         import_path, alias = tree.children
