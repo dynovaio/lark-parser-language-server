@@ -1,13 +1,7 @@
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
-from lark import Lark, LarkError, Token, Tree
-from lark.exceptions import (
-    ParseError,
-    UnexpectedCharacters,
-    UnexpectedEOF,
-    UnexpectedInput,
-)
+from lark import Lark, Token, Tree
 from lsprotocol.types import (
     CompletionItem,
     CompletionItemKind,
@@ -51,39 +45,45 @@ class LarkDocument:
         except Exception as e:  # pylint: disable=broad-except
             logger.exception("Error analyzing document %s", self.uri)
             self._add_diagnostic(
-                0, 0, f"Analysis error: {str(e)}", DiagnosticSeverity.Error
+                0,
+                0,
+                f"Analysis error: {str(e)}",
+                DiagnosticSeverity.Error,
             )
 
-    @staticmethod
-    def _on_parse_error(error: UnexpectedInput) -> bool:
-        logger.error("Parse error: %s", error)
-        return True
+    def _on_parse_error_handler(self) -> Callable[[Exception], bool]:
+        def _on_parse_error(e: Exception) -> bool:
+            """Handle parse errors and add diagnostics."""
+            line = 0
+            column = 0
+
+            if error_line := getattr(e, "line", None):
+                line = error_line - 1  # Convert to 0-based
+
+            if error_column := getattr(e, "column", None):
+                column = error_column - 1  # Convert to 0-based
+
+            self._add_diagnostic(
+                line,
+                column,
+                f"Parse error: {str(e)}",
+                DiagnosticSeverity.Error,
+            )
+            return True
+
+        return _on_parse_error
 
     def _parse_grammar(self) -> None:
         """Parse the Lark grammar and extract basic structure."""
-        try:
-            # Try to parse with Lark's own grammar
-            lark_parser = Lark.open_from_package(
-                "lark",
-                "grammars/lark.lark",
-                parser="lalr",
-            )
-            self._parsed_tree = lark_parser.parse(
-                self.source,
-                on_error=self._on_parse_error,
-            )
-        except (ParseError, UnexpectedCharacters, UnexpectedEOF, LarkError) as e:
-            # Extract position information from parse error
-            if isinstance(e, (UnexpectedCharacters, UnexpectedEOF)):
-                line = e.line - 1  # Convert to 0-based
-                col = e.column - 1 if e.column else 0
-                self._add_diagnostic(
-                    line, col, f"Parse error: {str(e)}", DiagnosticSeverity.Error
-                )
-            else:
-                self._add_diagnostic(
-                    0, 0, f"Parse error: {str(e)}", DiagnosticSeverity.Error
-                )
+        lark_parser = Lark.open_from_package(
+            "lark",
+            "grammars/lark.lark",
+            parser="lalr",
+        )
+        self._parsed_tree = lark_parser.parse(
+            self.source,
+            on_error=self._on_parse_error_handler(),
+        )
 
     def _extract_symbols(self) -> None:
         """Extract rules, terminals, and imports from the source."""
