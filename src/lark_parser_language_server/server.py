@@ -1,20 +1,7 @@
 import logging
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
-from lsprotocol.types import (
-    CompletionList,
-    CompletionParams,
-    DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams,
-    DocumentSymbol,
-    DocumentSymbolParams,
-    Hover,
-    HoverParams,
-    Location,
-    ReferenceParams,
-    TextDocumentPositionParams,
-)
+import lsprotocol.types as lsp
 from pygls.server import LanguageServer
 
 from .document import LarkDocument
@@ -34,48 +21,84 @@ class LarkLanguageServer(LanguageServer):
         self.documents: Dict[str, LarkDocument] = {}
         self._setup_features()
 
-    def _setup_features(self) -> None:  # pylint: disable=too-complex
+    @property
+    def _features_map(self) -> Dict[str, Callable]:
+        """Return a mapping of LSP features to their handlers."""
+        return {
+            lsp.TEXT_DOCUMENT_DID_OPEN: self.did_open_handler(),
+            lsp.TEXT_DOCUMENT_DID_CHANGE: self.did_change_handler(),
+            lsp.TEXT_DOCUMENT_DID_CLOSE: self.did_close_handler(),
+            lsp.TEXT_DOCUMENT_COMPLETION: self.completion_handler(),
+            lsp.TEXT_DOCUMENT_HOVER: self.hover_handler(),
+            lsp.TEXT_DOCUMENT_DEFINITION: self.definition_handler(),
+            lsp.TEXT_DOCUMENT_REFERENCES: self.references_handler(),
+            lsp.TEXT_DOCUMENT_DOCUMENT_SYMBOL: self.document_symbol_handler(),
+        }
 
-        @self.feature("textDocument/didOpen")
-        def did_open(params: DidOpenTextDocumentParams) -> None:
+    def _setup_features(self) -> None:
+        """Set up LSP features by registering their handlers."""
+        for feature, handler in self._features_map.items():
+            self.feature(feature)(handler)
+
+    def _publish_diagnostics(self, uri: str) -> None:
+        """Publish diagnostics for a document."""
+        if uri in self.documents:
+            diagnostics = self.documents[uri].get_diagnostics()
+            self.publish_diagnostics(uri, diagnostics)
+
+    def did_open_handler(self) -> Callable[[lsp.DidOpenTextDocumentParams], None]:
+        def _did_open(params: lsp.DidOpenTextDocumentParams) -> None:
             """Handle document open."""
             document = params.text_document
             self.documents[document.uri] = LarkDocument(document.uri, document.text)
             self._publish_diagnostics(document.uri)
 
-        @self.feature("textDocument/didChange")
-        def did_change(params: DidChangeTextDocumentParams) -> None:
+        return _did_open
+
+    def did_change_handler(self) -> Callable[[lsp.DidChangeTextDocumentParams], None]:
+        def _did_change(params: lsp.DidChangeTextDocumentParams) -> None:
             """Handle document changes."""
             uri = params.text_document.uri
             if uri in self.documents:
                 # For now, we handle full document changes
                 for change in params.content_changes:
+                    print(f"Document changed: {uri}")
+                    print(f"New content: {change.text}")
+
                     if hasattr(change, "text"):  # Full document change
                         self.documents[uri] = LarkDocument(uri, change.text)
                         self._publish_diagnostics(uri)
 
-        @self.feature("textDocument/didClose")
-        def did_close(params: DidCloseTextDocumentParams) -> None:
+        return _did_change
+
+    def did_close_handler(self) -> Callable[[lsp.DidCloseTextDocumentParams], None]:
+        def _did_close(params: lsp.DidCloseTextDocumentParams) -> None:
             """Handle document close."""
             uri = params.text_document.uri
             if uri in self.documents:
                 del self.documents[uri]
 
-        @self.feature("textDocument/completion")
-        def completion(params: CompletionParams) -> CompletionList:
+        return _did_close
+
+    def completion_handler(
+        self,
+    ) -> Callable[[lsp.CompletionParams], lsp.CompletionList]:
+        def _completion(params: lsp.CompletionParams) -> lsp.CompletionList:
             """Provide completion suggestions."""
             uri = params.text_document.uri
             if uri not in self.documents:
-                return CompletionList(is_incomplete=False, items=[])
+                return lsp.CompletionList(is_incomplete=False, items=[])
 
             document = self.documents[uri]
             position = params.position
             items = document.get_completions(position.line, position.character)
 
-            return CompletionList(is_incomplete=False, items=items)
+            return lsp.CompletionList(is_incomplete=False, items=items)
 
-        @self.feature("textDocument/hover")
-        def hover(params: HoverParams) -> Optional[Hover]:
+        return _completion
+
+    def hover_handler(self) -> Callable[[lsp.HoverParams], Optional[lsp.Hover]]:
+        def _hover(params: lsp.HoverParams) -> Optional[lsp.Hover]:
             """Provide hover information."""
             uri = params.text_document.uri
             if uri not in self.documents:
@@ -85,8 +108,14 @@ class LarkLanguageServer(LanguageServer):
             position = params.position
             return document.get_hover_info(position.line, position.character)
 
-        @self.feature("textDocument/definition")
-        def definition(params: TextDocumentPositionParams) -> Optional[Location]:
+        return _hover
+
+    def definition_handler(
+        self,
+    ) -> Callable[[lsp.TextDocumentPositionParams], Optional[lsp.Location]]:
+        def _definition(
+            params: lsp.TextDocumentPositionParams,
+        ) -> Optional[lsp.Location]:
             """Go to definition."""
             uri = params.text_document.uri
             if uri not in self.documents:
@@ -100,8 +129,10 @@ class LarkLanguageServer(LanguageServer):
                 return document.get_definition_location(symbol)
             return None
 
-        @self.feature("textDocument/references")
-        def references(params: ReferenceParams) -> List[Location]:
+        return _definition
+
+    def references_handler(self) -> Callable[[lsp.ReferenceParams], List[lsp.Location]]:
+        def _references(params: lsp.ReferenceParams) -> List[lsp.Location]:
             """Find references."""
             uri = params.text_document.uri
             if uri not in self.documents:
@@ -121,8 +152,14 @@ class LarkLanguageServer(LanguageServer):
                 return locations
             return []
 
-        @self.feature("textDocument/documentSymbol")
-        def document_symbol(params: DocumentSymbolParams) -> List[DocumentSymbol]:
+        return _references
+
+    def document_symbol_handler(
+        self,
+    ) -> Callable[[lsp.DocumentSymbolParams], List[lsp.DocumentSymbol]]:
+        def _document_symbol(
+            params: lsp.DocumentSymbolParams,
+        ) -> List[lsp.DocumentSymbol]:
             """Provide document symbols for outline view."""
             uri = params.text_document.uri
             if uri not in self.documents:
@@ -131,8 +168,4 @@ class LarkLanguageServer(LanguageServer):
             document = self.documents[uri]
             return document.get_document_symbols()
 
-    def _publish_diagnostics(self, uri: str) -> None:
-        """Publish diagnostics for a document."""
-        if uri in self.documents:
-            diagnostics = self.documents[uri].get_diagnostics()
-            self.publish_diagnostics(uri, diagnostics)
+        return _document_symbol
