@@ -5,7 +5,8 @@ from unittest.mock import patch
 import pytest
 from lsprotocol.types import CompletionParams, Position, TextDocumentIdentifier
 
-from lark_parser_language_server.server import LarkDocument, LarkLanguageServer
+from lark_parser_language_server.document import LarkDocument
+from lark_parser_language_server.server import LarkLanguageServer
 
 from .fixtures import MIXED_GRAMMAR, SIMPLE_GRAMMAR, VALID_GRAMMAR
 

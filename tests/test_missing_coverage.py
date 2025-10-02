@@ -10,7 +10,8 @@ from lsprotocol.types import (
     TextDocumentPositionParams,
 )
 
-from lark_parser_language_server.server import LarkDocument, LarkLanguageServer
+from lark_parser_language_server.document import LarkDocument
+from lark_parser_language_server.server import LarkLanguageServer
 
 from .fixtures import VALID_GRAMMAR
 

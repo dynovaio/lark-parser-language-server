@@ -2,7 +2,8 @@
 
 import pytest
 
-from lark_parser_language_server.server import LarkDocument, LarkLanguageServer
+from lark_parser_language_server.document import LarkDocument
+from lark_parser_language_server.server import LarkLanguageServer
 
 from .fixtures import SIMPLE_GRAMMAR, VALID_GRAMMAR
 

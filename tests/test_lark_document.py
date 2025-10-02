@@ -2,7 +2,7 @@
 
 from lsprotocol.types import CompletionItemKind, DiagnosticSeverity, Range, SymbolKind
 
-from lark_parser_language_server.server import LarkDocument
+from lark_parser_language_server.document import LarkDocument
 
 from .fixtures import (
     COMMENTED_GRAMMAR,
