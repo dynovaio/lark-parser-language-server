@@ -1,14 +1,13 @@
 import logging
 from typing import Dict, List, Optional, Tuple
 
-from lark import Lark, LarkError, Token, Tree
+from lark import Lark, LarkError, Tree
 from lark.exceptions import (
     ParseError,
     UnexpectedCharacters,
     UnexpectedEOF,
     UnexpectedInput,
 )
-from lark.visitors import Visitor
 from lsprotocol.types import (
     CompletionItem,
     CompletionItemKind,
@@ -21,64 +20,11 @@ from lsprotocol.types import (
     MarkupKind,
     Position,
     Range,
-    SymbolKind,
 )
 
+from .symbol_table import SymbolTable
+
 logger = logging.getLogger(__name__)
-
-
-class SymbolTableBuilder(Visitor):
-    def __init__(self):
-        self.symbols = []
-
-    def rule(self, tree: Tree):
-        rule = tree.children[0]
-        self._consume_symbol(rule)
-
-    def token(self, tree: Tree):
-        token = tree.children[0]
-        self._consume_symbol(token)
-
-    def alias(self, tree: Tree):
-        alias = tree.children[-1]
-        if alias:
-            self._consume_symbol(alias)
-
-    def __default__(self, tree: Tree):
-        if tree.data == "import":
-            self._handle_import(tree)
-
-        if tree.data == "multi_import":
-            self._handle_multi_import(tree)
-
-        if tree.data == "declare":
-            self._handle_declare(tree)
-
-    def _handle_import(self, tree: Tree):
-        import_path, alias = tree.children
-
-        if alias:
-            self._consume_symbol(alias.children[0])
-        else:
-            print(import_path)
-            self._consume_symbol(import_path.children[-1].children[0])
-
-    def _handle_multi_import(self, tree: Tree):
-        name_list = tree.children[-1]
-        for name in name_list.children:
-            self._consume_symbol(name.children[0])
-
-    def _handle_declare(self, tree: Tree):
-        for name in tree.children:
-            self._consume_symbol(name.children[0])
-
-    def _consume_symbol(self, source: Token):
-        name = source.value
-        clean_name = name.lstrip("?!")
-        offset = len(name) - len(clean_name)
-        line = (source.line - 1) if source.line else 0
-        col = (source.column - 1 + offset) if source.column else 0
-        self.symbols.append((clean_name, (line, col)))
 
 
 class LarkDocument:
@@ -86,6 +32,7 @@ class LarkDocument:
         self.uri = uri
         self.source = source
         self.lines = source.splitlines()
+        self._symbol_table = SymbolTable()
         self._parsed_tree: Optional[Tree] = None
         self._rules: Dict[str, Tuple[int, int]] = {}  # name -> (line, column)
         self._terminals: Dict[str, Tuple[int, int]] = {}  # name -> (line, column)
@@ -143,38 +90,7 @@ class LarkDocument:
     def _extract_symbols(self) -> None:
         """Extract rules, terminals, and imports from the source."""
         if self._parsed_tree:
-            symbol_table = SymbolTableBuilder()
-            symbol_table.visit_topdown(self._parsed_tree)
-            for name, (line, col) in symbol_table.symbols:
-                if name.isupper():
-                    self._terminals[name] = (line, col)
-                else:
-                    self._rules[name] = (line, col)
-
-        # for line_num, line in enumerate(self.lines):
-        #     line = line.strip()
-        #     if not line or line.startswith("//"):
-        #         continue
-        #     # Rule definitions (lowercase)
-        #     rule_match = re.match(r"^([?!]?)([a-z_][a-z0-9_]*)\s*:", line)
-        #     if rule_match:
-        #         rule_name = rule_match.group(2)
-        #         col = line.find(rule_name)
-        #         self._rules[rule_name] = (line_num, col)
-        #         continue
-        #     # Terminal definitions (uppercase)
-        #     terminal_match = re.match(r"^([A-Z_][A-Z0-9_]*)\s*:", line)
-        #     if terminal_match:
-        #         terminal_name = terminal_match.group(1)
-        #         col = line.find(terminal_name)
-        #         self._terminals[terminal_name] = (line_num, col)
-        #         continue
-        #     # Import statements
-        #     import_match = re.match(r"%import\s+([a-zA-Z_][a-zA-Z0-9_.]*)", line)
-        #     if import_match:
-        #         import_name = import_match.group(1)
-        #         col = line.find(import_name)
-        #         self._imports[import_name] = (line_num, col)
+            self._symbol_table.visit_topdown(self._parsed_tree)
 
     def _find_references(self) -> None:
         """Find all references to rules and terminals."""
@@ -330,41 +246,9 @@ class LarkDocument:
 
     def get_document_symbols(self) -> List[DocumentSymbol]:
         """Get document symbols for outline view."""
-        symbols = []
-
-        # Add rules
-        for rule_name, (line, col) in self._rules.items():
-            symbol = DocumentSymbol(
-                name=rule_name,
-                kind=SymbolKind.Function,
-                range=Range(
-                    start=Position(line=line, character=0),
-                    end=Position(line=line + 1, character=0),
-                ),
-                selection_range=Range(
-                    start=Position(line=line, character=col),
-                    end=Position(line=line, character=col + len(rule_name)),
-                ),
-            )
-            symbols.append(symbol)
-
-        # Add terminals
-        for terminal_name, (line, col) in self._terminals.items():
-            symbol = DocumentSymbol(
-                name=terminal_name,
-                kind=SymbolKind.Constant,
-                range=Range(
-                    start=Position(line=line, character=0),
-                    end=Position(line=line + 1, character=0),
-                ),
-                selection_range=Range(
-                    start=Position(line=line, character=col),
-                    end=Position(line=line, character=col + len(terminal_name)),
-                ),
-            )
-            symbols.append(symbol)
-
-        return symbols
+        return [
+            symbol.to_lsp_symbol() for symbol in self._symbol_table.symbols.values()
+        ]
 
     def get_completions(  # pylint: disable=unused-argument
         self, line: int, col: int
