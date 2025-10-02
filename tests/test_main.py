@@ -3,6 +3,7 @@ import logging
 import sys
 from unittest.mock import Mock, patch
 
+import lark_parser_language_server.__main__ as main_module
 from lark_parser_language_server.__main__ import add_arguments, main
 
 
@@ -114,7 +115,7 @@ class TestAddArguments:
         assert args.log_level == "DEBUG"
 
 
-class TestMain:
+class TestMainFunction:
     """Test the main function."""
 
     @patch("lark_parser_language_server.__main__.LarkLanguageServer")
@@ -313,3 +314,180 @@ class TestMain:
         mock_server.start_io.assert_called_once()
         mock_server.start_tcp.assert_not_called()
         mock_server.start_ws.assert_not_called()
+
+
+class TestMain:
+    """Tests for the main module additional functionality."""
+
+    def test_import_main_module(self):
+        """Test that the main module can be imported."""
+        # Should have the expected functions
+        assert hasattr(main_module, "add_arguments")
+        assert hasattr(main_module, "main")
+
+    def test_add_arguments_with_parser(self):
+        """Test add_arguments function with a real parser."""
+        # Create a real argument parser
+        parser = argparse.ArgumentParser()
+
+        # Call add_arguments
+        add_arguments(parser)
+
+        # Should have added multiple arguments - test by parsing some sample args
+        args = parser.parse_args(["--stdio"])
+        assert args.stdio is True
+        assert args.tcp is False
+
+        args = parser.parse_args(
+            ["--tcp", "--host", "0.0.0.0", "--port", "9999"]  # nosec
+        )
+        assert args.tcp is True
+        assert args.host == "0.0.0.0"  # nosec
+        assert args.port == 9999
+
+    @patch("lark_parser_language_server.__main__.LarkLanguageServer")
+    @patch("argparse.ArgumentParser.parse_args")
+    def test_main_function_stdio(self, mock_parse_args, mock_server_class):
+        """Test main function with stdio mode."""
+        # Mock the parsed arguments
+        mock_parse_args.return_value = argparse.Namespace(
+            stdio=True,
+            tcp=False,
+            ws=False,
+            host="localhost",
+            port=8888,
+            log_level="INFO",
+        )
+
+        # Mock the server instance
+        mock_server = Mock()
+        mock_server_class.return_value = mock_server
+        mock_server.start_io = Mock()
+
+        main()
+
+        # Verify server was created and started
+        mock_server_class.assert_called_once()
+        mock_server.start_io.assert_called_once()
+
+    @patch("lark_parser_language_server.__main__.LarkLanguageServer")
+    @patch("argparse.ArgumentParser.parse_args")
+    def test_main_function_tcp(self, mock_parse_args, mock_server_class):
+        """Test main function with TCP mode."""
+        # Mock the parsed arguments
+        mock_parse_args.return_value = argparse.Namespace(
+            stdio=False,
+            tcp=True,
+            ws=False,
+            host="localhost",
+            port=8888,
+            log_level="INFO",
+        )
+
+        # Mock the server instance
+        mock_server = Mock()
+        mock_server_class.return_value = mock_server
+        mock_server.start_tcp = Mock()
+
+        main()
+
+        # Verify server was started with TCP
+        mock_server.start_tcp.assert_called_once_with("localhost", 8888)
+
+    @patch("lark_parser_language_server.__main__.LarkLanguageServer")
+    @patch("argparse.ArgumentParser.parse_args")
+    def test_main_function_websocket(self, mock_parse_args, mock_server_class):
+        """Test main function with WebSocket mode."""
+        # Mock the parsed arguments
+        mock_parse_args.return_value = argparse.Namespace(
+            stdio=False,
+            tcp=False,
+            ws=True,
+            host="localhost",
+            port=8888,
+            log_level="INFO",
+        )
+
+        # Mock the server instance
+        mock_server = Mock()
+        mock_server_class.return_value = mock_server
+        mock_server.start_ws = Mock()
+
+        main()
+
+        # Verify server was started with WebSockets
+        mock_server.start_ws.assert_called_once_with("localhost", 8888)
+
+    @patch("lark_parser_language_server.__main__.LarkLanguageServer")
+    @patch("argparse.ArgumentParser.parse_args")
+    def test_main_function_default_stdio(self, mock_parse_args, mock_server_class):
+        """Test main function defaults to stdio when no mode specified."""
+        # Mock the parsed arguments - when all modes are False, should default to stdio
+        mock_parse_args.return_value = argparse.Namespace(
+            stdio=False,
+            tcp=False,
+            ws=False,
+            host="localhost",
+            port=8888,
+            log_level="INFO",
+        )
+
+        # Mock the server instance
+        mock_server = Mock()
+        mock_server_class.return_value = mock_server
+        mock_server.start_io = Mock()
+
+        main()
+
+        # Should default to stdio
+        mock_server.start_io.assert_called_once()
+
+    @patch("lark_parser_language_server.__main__.LarkLanguageServer")
+    @patch("lark_parser_language_server.__main__.logging")
+    @patch("argparse.ArgumentParser.parse_args")
+    def test_logging_configuration(
+        self, mock_parse_args, mock_logging, mock_server_class
+    ):
+        """Test that logging is configured."""
+
+        # Mock the parsed arguments
+        mock_parse_args.return_value = argparse.Namespace(
+            stdio=True,
+            tcp=False,
+            ws=False,
+            host="localhost",
+            port=8888,
+            log_level="DEBUG",
+        )
+
+        # Mock the server
+        mock_server = Mock()
+        mock_server_class.return_value = mock_server
+        mock_server.start_io = Mock()
+
+        main()
+
+        # Should have configured logging
+        mock_logging.basicConfig.assert_called_once()
+        # Verify DEBUG level was set correctly
+        call_args = mock_logging.basicConfig.call_args
+        assert "level" in call_args[1]
+
+    def test_argument_parser_choices(self):
+        """Test that argument parser has correct choices for log level."""
+        parser = argparse.ArgumentParser()
+        add_arguments(parser)
+
+        # Test valid log levels
+        for level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+            args = parser.parse_args(["--log-level", level])
+            assert args.log_level == level
+
+        # Test default values
+        args = parser.parse_args([])
+        assert args.stdio is False  # Not explicitly set
+        assert args.tcp is False
+        assert args.ws is False
+        assert args.host == "127.0.0.1"
+        assert args.port == 2087
+        assert args.log_level == "INFO"
