@@ -306,3 +306,9 @@ class LarkDocument:
                 end=Position(line=line, character=end_column),
             ),
         )
+
+    def format(self, options) -> str:  # pylint: disable=unused-argument
+        """Format the document according to the given options."""
+        # Placeholder: In a real implementation, integrate with a formatter
+        # For now, just return the original source
+        return self.source

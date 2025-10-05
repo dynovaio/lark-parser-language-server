@@ -8,6 +8,7 @@ from lsprotocol.types import (
     TEXT_DOCUMENT_DID_CLOSE,
     TEXT_DOCUMENT_DID_OPEN,
     TEXT_DOCUMENT_DOCUMENT_SYMBOL,
+    TEXT_DOCUMENT_FORMATTING,
     TEXT_DOCUMENT_HOVER,
     TEXT_DOCUMENT_REFERENCES,
     CompletionList,
@@ -15,6 +16,7 @@ from lsprotocol.types import (
     DidChangeTextDocumentParams,
     DidCloseTextDocumentParams,
     DidOpenTextDocumentParams,
+    DocumentFormattingParams,
     DocumentSymbol,
     DocumentSymbolParams,
     Hover,
@@ -54,6 +56,7 @@ class LarkLanguageServer(LanguageServer):
             TEXT_DOCUMENT_DEFINITION: self.definition_handler(),
             TEXT_DOCUMENT_REFERENCES: self.references_handler(),
             TEXT_DOCUMENT_DOCUMENT_SYMBOL: self.document_symbol_handler(),
+            TEXT_DOCUMENT_FORMATTING: self.document_formatting_handler(),
         }
 
     def _setup_features(self) -> None:
@@ -83,9 +86,6 @@ class LarkLanguageServer(LanguageServer):
             if uri in self.documents:
                 # For now, we handle full document changes
                 for change in params.content_changes:
-                    print(f"Document changed: {uri}")
-                    print(f"New content: {change.text}")
-
                     if hasattr(change, "text"):  # Full document change
                         self.documents[uri] = LarkDocument(uri, change.text)
                         self._publish_diagnostics(uri)
@@ -202,3 +202,19 @@ class LarkLanguageServer(LanguageServer):
             return document.get_document_symbols()
 
         return _document_symbol
+
+    def document_formatting_handler(
+        self,
+    ) -> Callable[[DocumentFormattingParams], str]:
+        def _document_formatting(
+            params: DocumentFormattingParams,
+        ) -> str:
+            """Format the document."""
+            uri = params.text_document.uri
+            if uri not in self.documents:
+                return ""
+
+            document = self.documents[uri]
+            return document.format(options=params.options)
+
+        return _document_formatting
