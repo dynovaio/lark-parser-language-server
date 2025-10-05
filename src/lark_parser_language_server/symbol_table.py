@@ -95,10 +95,12 @@ class SymbolRange:
         )
 
 
-class Symbol:
+class Symbol:  # pylint: disable=too-many-instance-attributes
     _token: Token
     _alias: bool
     _directive: Optional[str]
+    _parent: Optional["Symbol"]
+    _children: dict[str, "Symbol"]
 
     name: str
     position: SymbolPosition
@@ -118,6 +120,8 @@ class Symbol:
         self._tree = tree
         self._alias = alias
         self._directive = directive
+        self._children = {}
+        self._parent = None
         self._process_token()
 
     def __repr__(self) -> str:
@@ -245,9 +249,25 @@ class Symbol:
 
         return ", ".join(descriptions) if descriptions else None
 
+    @property
+    def parent(self) -> Optional["Symbol"]:
+        return self._parent
+
+    @property
+    def children(self) -> dict[str, "Symbol"]:
+        return self._children
+
+    def add_child(self, child: "Symbol") -> None:
+        self._children[child.name] = child
+        child._parent = self
+
     def get_lsp_kind(self) -> SymbolKind:
+        if self._parent:
+            return SymbolKind.Variable
+
         if self.kind == "terminal":
             return SymbolKind.Constant
+
         if self.kind == "rule":
             return SymbolKind.Function
 
@@ -260,16 +280,22 @@ class Symbol:
             detail=self.description,
             range=self.range.to_lsp_range(),
             selection_range=self.select_range.to_lsp_range(),
+            children=[child.to_lsp_symbol() for child in self.children.values()],
         )
 
 
 class SymbolTable(Visitor):
     symbols: Dict[str, Symbol]
     references: Dict[str, List[Symbol]]
+    annotations: Dict[str, List[str]]
+
+    _all_symbols: Dict[str, Symbol]
 
     def __init__(self):
         self.symbols = {}
         self.references = {}
+        self.annotations = {}
+        self._all_symbols = {}
 
     def __default__(self, tree: Tree):
         if tree.data == "import":
@@ -277,7 +303,19 @@ class SymbolTable(Visitor):
 
     def rule(self, tree: Tree):
         rule = tree.children[0]
-        self._consume_symbol(tree, rule)
+        rule_symbol = self._consume_symbol(tree, rule)
+
+        rule_params = tree.children[1] if len(tree.children) > 1 else None
+        if rule_params:
+            for param in rule_params.children:
+                param_symbol = self._get_symbol(tree, param)
+                if rule_symbol and param_symbol and rule_symbol.name in self.symbols:
+                    rule_symbol.add_child(param_symbol)
+                    self.symbols[rule_symbol.name] = rule_symbol
+
+    # def rule_params(self, tree: Tree):
+    #     for param in tree.children:
+    #         self._consume_symbol(tree, param)
 
     def token(self, tree: Tree):
         token = tree.children[0]
@@ -309,9 +347,32 @@ class SymbolTable(Visitor):
         for name in tree.children:
             self._consume_symbol(tree, name.children[0], directive="declare")
 
+    def _get_symbol(
+        self,
+        tree: Tree,
+        token: Branch,
+        *,
+        alias=False,
+        directive=None,
+    ) -> Optional[Symbol]:
+        if isinstance(token, Token):
+            return Symbol(
+                token,
+                tree=tree,
+                alias=alias,
+                directive=directive,
+            )
+
+        return None
+
     def _consume_symbol(
-        self, tree: Tree, token: Branch, *, alias=False, directive=None
-    ):
+        self,
+        tree: Tree,
+        token: Branch,
+        *,
+        alias=False,
+        directive=None,
+    ) -> Optional[Symbol]:
         if isinstance(token, Token):
             symbol = Symbol(
                 token,
@@ -320,13 +381,29 @@ class SymbolTable(Visitor):
                 directive=directive,
             )
             self.symbols[symbol.name] = symbol
+            return symbol
+
+        return None
 
     def _clean_symbol_name(self, name: str) -> str:
         return name.lstrip("?!")
 
     def __getitem__(self, name: str) -> "Symbol":
         clean_name = self._clean_symbol_name(name)
-        if clean_name in self.symbols:
+        if clean_name in self.get_all_symbols():
             return self.symbols[clean_name]
 
         raise KeyError(f"Symbol '{name}' not found in symbol table")
+
+    def __contains__(self, name: str) -> bool:
+        clean_name = self._clean_symbol_name(name)
+        return clean_name in self.get_all_symbols()
+
+    def get_all_symbols(self, force_refresh: bool = False) -> dict[str, Symbol]:
+        if not self._all_symbols or force_refresh:
+            self._all_symbols = {}
+            for name, symbol in self.symbols.items():
+                self._all_symbols[name] = symbol
+                self._all_symbols.update(symbol.children)
+
+        return self._all_symbols

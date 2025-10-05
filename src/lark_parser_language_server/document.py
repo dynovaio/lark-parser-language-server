@@ -138,7 +138,7 @@ class LarkDocument:
 
     def _validate_references(self) -> None:
         """Validate that all referenced symbols are defined."""
-        defined_symbols = self._symbol_table.symbols.keys()
+        defined_symbols = self._symbol_table.get_all_symbols().keys()
         referenced_symbols = self._references.keys()
 
         for symbol_name in referenced_symbols:
