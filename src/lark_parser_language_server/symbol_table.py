@@ -275,12 +275,6 @@ class SymbolTable(Visitor):
         if tree.data == "import":
             self._handle_import(tree)
 
-        if tree.data == "multi_import":
-            self._handle_multi_import(tree)
-
-        if tree.data == "declare":
-            self._handle_declare(tree)
-
     def rule(self, tree: Tree):
         rule = tree.children[0]
         self._consume_symbol(tree, rule)
@@ -302,17 +296,16 @@ class SymbolTable(Visitor):
                 tree, alias.children[0], alias=True, directive="import"
             )
         else:
-            print(import_path)
             self._consume_symbol(
                 tree, import_path.children[-1].children[0], directive="import"
             )
 
-    def _handle_multi_import(self, tree: Tree):
+    def multi_import(self, tree: Tree):
         name_list = tree.children[-1]
         for name in name_list.children:
             self._consume_symbol(tree, name.children[0], directive="import")
 
-    def _handle_declare(self, tree: Tree):
+    def declare(self, tree: Tree):
         for name in tree.children:
             self._consume_symbol(tree, name.children[0], directive="declare")
 
