@@ -75,6 +75,9 @@ class AstBuilder(Transformer):
     def STRING(self, s):
         return s.value[1:-1]
 
+    def REGEXP(self, s):
+        return s.value
+
     def start(self, tree):
         return Ast(tree=tree)
 
@@ -97,4 +100,4 @@ def _get_ast_builder() -> AstBuilder:  # type: ignore
 
 _get_ast_builder.cache: Optional[AstBuilder] = None  # type: ignore
 
-AST_BUILDER = _get_ast_builder()
+AST_BUILDER: AstBuilder = _get_ast_builder()  # type: ignore
