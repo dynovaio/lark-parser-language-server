@@ -43,79 +43,6 @@ class AstNode(BaseAstNode):
         return f"{self.__class__.__name__}(meta={self.meta})"
 
 
-class Declare(AstNode):
-    symbols: list[Token]
-
-    def __post_init__(self):
-        self.symbols = cast(list[Token], self._tree.children)
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(meta={self.meta!r}, symbols={self.symbols!r})"
-        )
-
-
-class Ignore(AstNode):
-    symbols: list[Token]
-
-    def __post_init__(self):
-        self.symbols = cast(list[Token], self._tree.children[0])
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(meta={self.meta!r}, symbols={self.symbols!r})"
-        )
-
-
-class Import(AstNode):
-    path: str
-    symbols: list[Token]
-    alias: Optional[Token] = None
-
-    def __post_init__(self):
-        if len(self._tree.children) == 1:
-            self.path = cast(list[str], self._tree.children[0])[0]
-            self.symbols = [cast(list[Token], self._tree.children[0])[1]]
-            return
-
-        if len(self._tree.children) == 2 and isinstance(self._tree.children[1], Token):
-            self.path = ".".join(cast(list[Token], self._tree.children[0])[:-1])
-            self.symbols = [cast(list[Token], self._tree.children[0])[-1]]
-            self.alias = cast(Token, self._tree.children[1])
-            return
-
-        self.path = "".join(cast(list[Token], self._tree.children[0]))
-        self.symbols = cast(list[Token], self._tree.children[1])
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(meta={self.meta!r}, "
-            f"path={self.path!r}, "
-            f"symbols={self.symbols!r}, "
-            f"alias={self.alias!r})"
-        )
-
-
-class Override(AstNode):
-    definition: "Rule | Term"
-
-    def __post_init__(self):
-        self.definition = cast("Rule | Term", self._tree.children[0])
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(meta={self.meta!r}, definition={self.definition!r})"
-
-
-class Extend(AstNode):
-    definition: "Rule | Term"
-
-    def __post_init__(self):
-        self.definition = cast("Rule | Term", self._tree.children[0])
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(meta={self.meta!r}, definition={self.definition!r})"
-
-
 class Range(AstNode):
     start: str
     end: str
@@ -130,11 +57,13 @@ class Range(AstNode):
 
 class TemplateUsage(AstNode):
     rule: Token
-    arguments: list[Token]
+    arguments: list["str | Token | Range | TemplateUsage"]
 
     def __post_init__(self):
         self.rule = cast(Token, self._tree.children[0])
-        self.arguments = cast(list[Token], self._tree.children[1:])
+        self.arguments = cast(
+            list[str | Token | Range | TemplateUsage], self._tree.children[1:]
+        )
 
     def __repr__(self) -> str:
         return (
@@ -157,24 +86,8 @@ class Maybe(AstNode):
         return f"{self.__class__.__name__}(meta={self.meta!r}, expansions={self.expansions!r})"
 
 
-class Expr(AstNode):
-    atom: Token
-    operators: Optional[list[Token]] = None
-
-    def __post_init__(self):
-        self.atom = cast(Token, self._tree.children[0])
-        self.operators = cast(list[Token], self._tree.children[1:])
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(meta={self.meta!r}, "
-            f"atom={self.atom!r}, "
-            f"operators={self.operators!r})"
-        )
-
-
 class Expansion(AstNode):
-    expressions: list[Expr]
+    expressions: list["Expr"]
     alias: Optional[Token] = None
 
     def __post_init__(self):
@@ -212,6 +125,25 @@ class Alias(AstNode):
             f"{self.__class__.__name__}(meta={self.meta!r}, "
             f"name={self.name!r}, "
             f"expansion={self.expansion!r})"
+        )
+
+
+class Expr(AstNode):
+    atom: str | Token | Expansion | Maybe | TemplateUsage | Range
+    operators: Optional[list[Token]] = None
+
+    def __post_init__(self):
+        self.atom = cast(
+            str | Token | Expansion | Maybe | TemplateUsage | Range,
+            self._tree.children[0],
+        )
+        self.operators = cast(list[Token], self._tree.children[1:])
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(meta={self.meta!r}, "
+            f"atom={self.atom!r}, "
+            f"operators={self.operators!r})"
         )
 
 
@@ -276,6 +208,67 @@ class Rule(AstNode):
         )
 
 
+class Declare(AstNode):
+    symbols: list[Token]
+
+    def __post_init__(self):
+        self.symbols = cast(list[Token], self._tree.children)
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(meta={self.meta!r}, symbols={self.symbols!r})"
+        )
+
+
+class Import(AstNode):
+    path: str
+    symbols: list[Token]
+    alias: Optional[Token] = None
+
+    def __post_init__(self):
+        if len(self._tree.children) == 1:
+            self.path = cast(list[str], self._tree.children[0])[0]
+            self.symbols = [cast(list[Token], self._tree.children[0])[1]]
+            return
+
+        if len(self._tree.children) == 2 and isinstance(self._tree.children[1], Token):
+            self.path = ".".join(cast(list[Token], self._tree.children[0])[:-1])
+            self.symbols = [cast(list[Token], self._tree.children[0])[-1]]
+            self.alias = cast(Token, self._tree.children[1])
+            return
+
+        self.path = "".join(cast(list[Token], self._tree.children[0]))
+        self.symbols = cast(list[Token], self._tree.children[1])
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(meta={self.meta!r}, "
+            f"path={self.path!r}, "
+            f"symbols={self.symbols!r}, "
+            f"alias={self.alias!r})"
+        )
+
+
+class Override(AstNode):
+    definition: Rule | Term
+
+    def __post_init__(self):
+        self.definition = cast(Rule | Term, self._tree.children[0])
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(meta={self.meta!r}, definition={self.definition!r})"
+
+
+class Extend(AstNode):
+    definition: Rule | Term
+
+    def __post_init__(self):
+        self.definition = cast(Rule | Term, self._tree.children[0])
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(meta={self.meta!r}, definition={self.definition!r})"
+
+
 class Comment(AstNode):
     content: Token
 
@@ -289,6 +282,25 @@ class Comment(AstNode):
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(meta={self.meta!r}, content={self.content!r})"
+        )
+
+
+class Ignore(AstNode):
+    expansions: list[Expansion]
+
+    def __post_init__(self):
+        self.expansions = [
+            expansion.to_expansion() if isinstance(expansion, Alias) else expansion
+            for expansion in cast(
+                list[Expansion | Alias],
+                self._tree.children[0],
+            )
+        ]
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(meta={self.meta!r}, "
+            f"expansions={self.expansions!r})"
         )
 
 
