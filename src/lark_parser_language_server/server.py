@@ -24,6 +24,7 @@ from lsprotocol.types import (
     Location,
     ReferenceParams,
     TextDocumentPositionParams,
+    TextDocumentSyncKind,
 )
 from pygls.server import LanguageServer
 
@@ -34,12 +35,20 @@ logger = logging.getLogger(__name__)
 
 
 class LarkLanguageServer(LanguageServer):
-    """Language Server for Lark grammar files."""
+    """Language Server for Lark grammar files.
+
+    This server is configured to use TextDocumentSyncKind.Full, which means:
+    - When a file is edited, the server receives the ENTIRE file content
+    - Not just the incremental changes/diffs
+    - This simplifies document handling but uses more bandwidth
+    - Perfect for grammar files which are typically not huge
+    """
 
     def __init__(self) -> None:
         super().__init__(
             "lark-parser-language-server",
             __version__,
+            text_document_sync_kind=TextDocumentSyncKind.Full,
         )
         self.documents: Dict[str, LarkDocument] = {}
         self._setup_features()
@@ -81,12 +90,15 @@ class LarkLanguageServer(LanguageServer):
 
     def did_change_handler(self) -> Callable[[DidChangeTextDocumentParams], None]:
         def _did_change(params: DidChangeTextDocumentParams) -> None:
-            """Handle document changes."""
+            """Handle document changes.
+
+            With TextDocumentSyncKind.Full configured, we receive the entire
+            document content on every change, not just the incremental changes.
+            """
             uri = params.text_document.uri
             if uri in self.documents:
-                # For now, we handle full document changes
                 for change in params.content_changes:
-                    if hasattr(change, "text"):  # Full document change
+                    if hasattr(change, "text"):
                         self.documents[uri] = LarkDocument(uri, change.text)
                         self._publish_diagnostics(uri)
 
