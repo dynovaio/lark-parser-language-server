@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 
 from lark import Token, Tree
 from lark.tree import Meta
@@ -9,6 +9,7 @@ from lsprotocol.types import (
     CompletionItemKind,
     DocumentSymbol,
     Hover,
+    Location,
     MarkupContent,
     MarkupKind,
 )
@@ -101,7 +102,7 @@ class Range:
 
         return cls(start=start, end=end)
 
-    def __contains__(self, position: Position) -> bool:
+    def _contains_position(self, position: Position) -> bool:
         if position.line < self.start.line or position.line > self.end.line:
             return False
 
@@ -112,6 +113,17 @@ class Range:
             return False
 
         return True
+
+    def __contains__(self, other: "Position | Range") -> bool:
+        if isinstance(other, Range):
+            return self._contains_position(other.start) and self._contains_position(
+                other.end
+            )
+
+        if isinstance(other, Position):
+            return self._contains_position(other)
+
+        raise TypeError(f"Unsupported type for containment check: {type(other)}")
 
     def to_lsp_range(self) -> LspRange:
         return LspRange(
@@ -128,10 +140,14 @@ class Definition:
     selection_range: Range
 
     parent: Optional["Definition"] = None
-    children: Optional[List["Definition"]] = None
+    children: Optional[dict[str, list["Definition"]]] = None
 
     directives: Directives = Directives(0)
     modifiers: Modifiers = Modifiers(0)
+
+    def __post_init__(self):
+        if self.children is None:
+            self.children = {}
 
     def _lsp_kind(self) -> SymbolKind:
         kind_mapping = {
@@ -162,10 +178,14 @@ class Definition:
 
     def append_child(self, child: "Definition") -> None:
         if self.children is None:
-            self.children = []
+            self.children = {}
 
         child.parent = self
-        self.children.append(child)
+
+        if child.name not in self.children:
+            self.children[child.name] = []
+
+        self.children[child.name].append(child)
 
     def to_lsp_document_symbol(self) -> DocumentSymbol:
         return DocumentSymbol(
@@ -174,7 +194,11 @@ class Definition:
             range=self.range.to_lsp_range(),
             selection_range=self.selection_range.to_lsp_range(),
             children=(
-                [child.to_lsp_document_symbol() for child in self.children]
+                [
+                    child.to_lsp_document_symbol()
+                    for child_name in self.children
+                    for child in self.children[child_name]
+                ]
                 if self.children
                 else None
             ),
@@ -207,6 +231,12 @@ class Definition:
             range=range_,
         )
 
+    def to_lsp_location(self, uri: str) -> Location:
+        return Location(
+            uri=uri,
+            range=self.range.to_lsp_range(),
+        )
+
 
 @dataclass
 class Reference:
@@ -220,16 +250,18 @@ class Reference:
     def from_token(
         cls, token: Token, ast_node: Optional[AstNode] = None
     ) -> "Reference":
-        name = str(token)
-        position = Position.from_token(token)
-        range_ = Range.from_token(token)
-        kind = Kind.RULE if token.type == "RULE" else Kind.TERMINAL
         return cls(
-            name=name,
-            position=position,
-            range=range_,
-            kind=kind,
+            name=str(token),
+            position=Position.from_token(token),
+            range=Range.from_token(token),
+            kind=Kind.RULE if token.type == "RULE" else Kind.TERMINAL,
             ast_node=ast_node,
+        )
+
+    def to_lsp_location(self, uri: str) -> Location:
+        return Location(
+            uri=uri,
+            range=self.range.to_lsp_range(),
         )
 
 
