@@ -47,14 +47,27 @@ def definitions_from_expansions(expansions: list[Expansion]) -> list[Definition]
 
 def definitions_from_import(import_: Import) -> list[Definition]:
     if import_.alias:
-        return [
+        import_definition = Definition(
+            name=str(import_.alias),
+            kind=Kind.RULE if import_.alias.type == "RULE" else Kind.TERMINAL,
+            range=Range.from_meta(import_.meta),
+            selection_range=Range.from_token(import_.alias),
+        )
+
+        aliased_definitions = [
             Definition(
-                name=str(import_.alias),
-                kind=Kind.RULE if import_.alias.type == "RULE" else Kind.TERMINAL,
-                range=Range.from_meta(import_.meta),
-                selection_range=Range.from_token(import_.alias),
+                name=str(symbol),
+                kind=Kind.RULE if symbol.type == "RULE" else Kind.TERMINAL,
+                range=import_definition.range,
+                selection_range=Range.from_token(symbol),
             )
+            for symbol in import_.symbols
         ]
+
+        for definition in aliased_definitions:
+            import_definition.append_child(definition)
+
+        return [import_definition]
 
     return [
         Definition(
@@ -83,16 +96,11 @@ def definitions_from_rule_params(
 
 
 def definitions_from_rule(rule: Rule) -> list[Definition]:
-    token = rule.name
-    name = str(token)
-    range_ = Range.from_meta(rule.meta)
-    selection_range = Range.from_token(token)
-
     rule_definition = Definition(
-        name=name,
+        name=str(rule.name),
         kind=Kind.RULE,
-        range=range_,
-        selection_range=selection_range,
+        range=Range.from_meta(rule.meta),
+        selection_range=Range.from_token(rule.name),
     )
 
     for parameter_definition in definitions_from_rule_params(
@@ -110,16 +118,11 @@ def definitions_from_rule(rule: Rule) -> list[Definition]:
 
 
 def definitions_from_term(term: Term) -> list[Definition]:
-    token = term.name
-    name = str(token)
-    range_ = Range.from_meta(term.meta)
-    selection_range = Range.from_token(token)
-
     term_definition = Definition(
-        name=name,
+        name=str(term.name),
         kind=Kind.TERMINAL,
-        range=range_,
-        selection_range=selection_range,
+        range=Range.from_meta(term.meta),
+        selection_range=Range.from_token(term.name),
     )
 
     for modifier in term.modifiers:
@@ -300,8 +303,6 @@ def references_from_rule(
 def references_from_ast_node(
     node: AstNode | Token, ast_node: Optional[AstNode] = None
 ) -> list[Reference]:
-    print(f"Extracting references from node: {node!r} with ast_node: {ast_node!r}")
-
     if isinstance(node, Token):
         return [Reference.from_token(node, ast_node=ast_node)]
 
