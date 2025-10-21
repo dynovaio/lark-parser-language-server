@@ -22,9 +22,12 @@ from lsprotocol.types import (
     Hover,
     HoverParams,
     Location,
+    Position,
+    Range,
     ReferenceParams,
     TextDocumentPositionParams,
     TextDocumentSyncKind,
+    TextEdit,
 )
 from pygls.server import LanguageServer
 
@@ -217,16 +220,25 @@ class LarkLanguageServer(LanguageServer):
 
     def document_formatting_handler(
         self,
-    ) -> Callable[[DocumentFormattingParams], str]:
+    ) -> Callable[[DocumentFormattingParams], list[TextEdit]]:
+
         def _document_formatting(
             params: DocumentFormattingParams,
-        ) -> str:
+        ) -> list[TextEdit]:
             """Format the document."""
             uri = params.text_document.uri
             if uri not in self.documents:
-                return ""
+                return [
+                    TextEdit(
+                        range=Range(
+                            start=Position(line=0, character=0),
+                            end=Position(line=0, character=0),
+                        ),
+                        new_text="",
+                    )
+                ]
 
             document = self.documents[uri]
-            return document.format(options=params.options)
+            return [document.format(options=params.options)]
 
         return _document_formatting

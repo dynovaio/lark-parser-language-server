@@ -45,7 +45,7 @@ def _format_expr(expr: Expr) -> str:
         else ""
     )
 
-    if expr.operators and len(expr.operators) == 2:
+    if expr.operators and len(expr.operators) == 3:
         operators = f"{operators}..{str(expr.operators[2])}"
 
     wrap_within_parens = isinstance(expr.atom, list)

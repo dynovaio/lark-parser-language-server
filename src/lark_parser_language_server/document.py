@@ -12,8 +12,10 @@ from lsprotocol.types import (
     Location,
     Position,
     Range,
+    TextEdit,
 )
 
+from lark_parser_language_server.formatter import FORMATTER
 from lark_parser_language_server.parser import PARSER
 from lark_parser_language_server.symbol_table import SymbolTable
 from lark_parser_language_server.symbol_table.symbol import KEYWORDS, Reference
@@ -250,8 +252,23 @@ class LarkDocument:
             )
         )
 
-    def format(self, options) -> str:  # pylint: disable=unused-argument
+    def format(self, options) -> TextEdit:  # pylint: disable=unused-argument
         """Format the document according to the given options."""
-        # Placeholder: In a real implementation, integrate with a formatter
-        # For now, just return the original source
-        return self.source
+        if self._ast:
+            new_text = FORMATTER.format(self._ast)
+            range_ = Range(
+                start=Position(line=0, character=0),
+                end=Position(line=len(new_text.split("\n")) + 1, character=0),
+            )
+            return TextEdit(
+                new_text=new_text,
+                range=range_,
+            )
+
+        return TextEdit(
+            new_text=self.source,
+            range=Range(
+                start=Position(line=0, character=0),
+                end=Position(line=len(self.source.split("\n")) + 1, character=0),
+            ),
+        )
