@@ -303,7 +303,7 @@ def references_from_rule(
 def references_from_ast_node(
     node: AstNode | Token, ast_node: Optional[AstNode] = None
 ) -> list[Reference]:
-    if isinstance(node, Token):
+    if isinstance(node, Token) and node.type in {"RULE", "TERMINAL"}:
         return [Reference.from_token(node, ast_node=ast_node)]
 
     extractor_map = {

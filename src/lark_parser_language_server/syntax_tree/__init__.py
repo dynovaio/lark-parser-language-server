@@ -76,7 +76,7 @@ class AstBuilder(Transformer):
         return s.value[1:-1]
 
     def REGEXP(self, s):
-        return s.value
+        return s
 
     def start(self, tree):
         return Ast(tree=tree)
