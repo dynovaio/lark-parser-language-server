@@ -50,7 +50,7 @@ expansion: _expansion
 
 _expansion: [_expansion expr]
 
-?expr: atom [OP | TILDE NUMBER [_DOTDOT NUMBER]]
+expr: atom [OP | TILDE NUMBER [_DOTDOT NUMBER]]
 
 ?atom: _LPAR expansions _RPAR
     | maybe
