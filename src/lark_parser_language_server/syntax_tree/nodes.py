@@ -129,12 +129,12 @@ class Alias(AstNode):
 
 
 class Expr(AstNode):
-    atom: str | Token | Expansion | Maybe | TemplateUsage | Range
+    atom: str | Token | list[Expansion] | Maybe | TemplateUsage | Range
     operators: Optional[list[Token]] = None
 
     def __post_init__(self):
         self.atom = cast(
-            str | Token | Expansion | Maybe | TemplateUsage | Range,
+            str | Token | list[Expansion] | Maybe | TemplateUsage | Range,
             self._tree.children[0],
         )
         self.operators = cast(list[Token], self._tree.children[1:])
