@@ -134,9 +134,12 @@ class LarkDocument:
         """Add a diagnostic to the list."""
         # Ensure line and column are within bounds
         line = max(0, getattr(error, "line", 0))
-        line = min(line, len(self.lines) - 1)
-
-        line_text = self.lines[line]
+        if self.lines:
+            line = min(line, len(self.lines) - 1)
+            line_text = self.lines[line]
+        else:
+            line = 0
+            line_text = ""
 
         col = max(0, getattr(error, "column", 0))
         col = min(col, len(line_text))
