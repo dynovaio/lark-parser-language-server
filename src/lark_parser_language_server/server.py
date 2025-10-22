@@ -8,6 +8,7 @@ from lsprotocol.types import (
     TEXT_DOCUMENT_DID_CLOSE,
     TEXT_DOCUMENT_DID_OPEN,
     TEXT_DOCUMENT_DOCUMENT_SYMBOL,
+    TEXT_DOCUMENT_FORMATTING,
     TEXT_DOCUMENT_HOVER,
     TEXT_DOCUMENT_REFERENCES,
     CompletionList,
@@ -15,13 +16,18 @@ from lsprotocol.types import (
     DidChangeTextDocumentParams,
     DidCloseTextDocumentParams,
     DidOpenTextDocumentParams,
+    DocumentFormattingParams,
     DocumentSymbol,
     DocumentSymbolParams,
     Hover,
     HoverParams,
     Location,
+    Position,
+    Range,
     ReferenceParams,
     TextDocumentPositionParams,
+    TextDocumentSyncKind,
+    TextEdit,
 )
 from pygls.server import LanguageServer
 
@@ -32,12 +38,20 @@ logger = logging.getLogger(__name__)
 
 
 class LarkLanguageServer(LanguageServer):
-    """Language Server for Lark grammar files."""
+    """Language Server for Lark grammar files.
+
+    This server is configured to use TextDocumentSyncKind.Full, which means:
+    - When a file is edited, the server receives the ENTIRE file content
+    - Not just the incremental changes/diffs
+    - This simplifies document handling but uses more bandwidth
+    - Perfect for grammar files which are typically not huge
+    """
 
     def __init__(self) -> None:
         super().__init__(
             "lark-parser-language-server",
             __version__,
+            text_document_sync_kind=TextDocumentSyncKind.Full,
         )
         self.documents: Dict[str, LarkDocument] = {}
         self._setup_features()
@@ -54,6 +68,7 @@ class LarkLanguageServer(LanguageServer):
             TEXT_DOCUMENT_DEFINITION: self.definition_handler(),
             TEXT_DOCUMENT_REFERENCES: self.references_handler(),
             TEXT_DOCUMENT_DOCUMENT_SYMBOL: self.document_symbol_handler(),
+            TEXT_DOCUMENT_FORMATTING: self.document_formatting_handler(),
         }
 
     def _setup_features(self) -> None:
@@ -78,15 +93,15 @@ class LarkLanguageServer(LanguageServer):
 
     def did_change_handler(self) -> Callable[[DidChangeTextDocumentParams], None]:
         def _did_change(params: DidChangeTextDocumentParams) -> None:
-            """Handle document changes."""
+            """Handle document changes.
+
+            With TextDocumentSyncKind.Full configured, we receive the entire
+            document content on every change, not just the incremental changes.
+            """
             uri = params.text_document.uri
             if uri in self.documents:
-                # For now, we handle full document changes
                 for change in params.content_changes:
-                    print(f"Document changed: {uri}")
-                    print(f"New content: {change.text}")
-
-                    if hasattr(change, "text"):  # Full document change
+                    if hasattr(change, "text"):
                         self.documents[uri] = LarkDocument(uri, change.text)
                         self._publish_diagnostics(uri)
 
@@ -202,3 +217,28 @@ class LarkLanguageServer(LanguageServer):
             return document.get_document_symbols()
 
         return _document_symbol
+
+    def document_formatting_handler(
+        self,
+    ) -> Callable[[DocumentFormattingParams], list[TextEdit]]:
+
+        def _document_formatting(
+            params: DocumentFormattingParams,
+        ) -> list[TextEdit]:
+            """Format the document."""
+            uri = params.text_document.uri
+            if uri not in self.documents:
+                return [
+                    TextEdit(
+                        range=Range(
+                            start=Position(line=0, character=0),
+                            end=Position(line=0, character=0),
+                        ),
+                        new_text="",
+                    )
+                ]
+
+            document = self.documents[uri]
+            return [document.format(options=params.options)]
+
+        return _document_formatting

@@ -2,12 +2,21 @@ import argparse
 import logging
 import sys
 
+from lark_parser_language_server import __version__
 from lark_parser_language_server.server import LarkLanguageServer
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add command-line arguments."""
     parser.description = "Lark Language Server"
+
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"Lark Parser Language Server {__version__}",
+        help="Show the version and exit",
+    )
 
     parser.add_argument(
         "--stdio",

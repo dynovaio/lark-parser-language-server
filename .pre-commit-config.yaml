@@ -77,13 +77,13 @@ repos:
     hooks:
       - id: black
 
-  - repo: local
-    hooks:
-      - id: fix-string-concat-in-nbdev-lib
-        name: fix-string-concat-in-nbdev-lib
-        files: \.py$
-        language: system
-        entry: sed -i -r 's/ " "/ /g'
+  # - repo: local
+  #   hooks:
+  #     - id: fix-string-concat-in-nbdev-lib
+  #       name: fix-string-concat-in-nbdev-lib
+  #       files: \.py$
+  #       language: system
+  #       entry: sed -i -r 's/ " "/ /g'
 
   - repo: https://github.com/pycqa/flake8
     rev: 7.3.0

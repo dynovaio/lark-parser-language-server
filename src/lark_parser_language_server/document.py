@@ -1,177 +1,161 @@
 import logging
+import traceback
 from typing import Callable, Dict, List, Optional, Tuple
 
-from lark import Lark, Token, Tree
+from lark import Lark, Tree
 from lsprotocol.types import (
     CompletionItem,
-    CompletionItemKind,
     Diagnostic,
     DiagnosticSeverity,
     DocumentSymbol,
+    FormattingOptions,
     Hover,
     Location,
-    MarkupContent,
-    MarkupKind,
     Position,
     Range,
+    TextEdit,
 )
 
-from lark_parser_language_server.symbol_table import Symbol, SymbolTable
+from lark_parser_language_server.formatter import FORMATTER
+from lark_parser_language_server.parser import PARSER
+from lark_parser_language_server.symbol_table import SymbolTable
+from lark_parser_language_server.symbol_table.symbol import KEYWORDS, Reference
+from lark_parser_language_server.syntax_tree import AST_BUILDER, Ast
 
 logger = logging.getLogger(__name__)
 
 
 class LarkDocument:
+    uri: str
+    source: str
+    lines: list[str]
+    _symbol_table: SymbolTable
+    _parsed_tree: Optional[Tree]
+    _references: Dict[str, List[Reference]]
+    _diagnostics: List[Diagnostic]
+    _ast: Optional[Ast]
+
     def __init__(self, uri: str, source: str) -> None:
         self.uri = uri
         self.source = source
         self.lines = source.splitlines()
         self._symbol_table = SymbolTable()
-        self._parsed_tree: Optional[Tree] = None
-        self._references: Dict[str, List[Symbol]] = {}  # name -> [(line, col), ...]
-        self._diagnostics: List[Diagnostic] = []
+        self._parsed_tree = None
+        self._references = {}
+        self._diagnostics = []
+        self._ast = None
         self._analyze()
 
     def _analyze(self) -> None:
-        """Analyze the document for symbols, references, and diagnostics."""
         try:
             self._parse_grammar()
-            self._extract_symbols()
-            self._find_references()
+            self._build_ast()
+            self._collect_definitions()
+            self._validate_definitions()
+            self._collect_references()
             self._validate_references()
-        except Exception as e:  # pylint: disable=broad-except
+            # Load the grammar to catch any additional errors
+            self._load_document_grammar()
+        except Exception as error:  # pylint: disable=broad-except
             logger.exception("Error analyzing document %s", self.uri)
+            logger.debug("Traceback: %s", traceback.format_exc())
             self._add_diagnostic(
-                0,
-                0,
-                f"Analysis error: {str(e)}",
-                DiagnosticSeverity.Error,
+                error,
+                message=f"Error analyzing document: {str(error)}",
             )
 
     def _on_parse_error_handler(self) -> Callable[[Exception], bool]:
-        def _on_parse_error(e: Exception) -> bool:
-            """Handle parse errors and add diagnostics."""
-            line = 0
-            column = 0
-
-            if error_line := getattr(e, "line", None):
-                line = error_line - 1  # Convert to 0-based
-
-            if error_column := getattr(e, "column", None):
-                column = error_column - 1  # Convert to 0-based
-
+        def _on_parse_error(error: Exception) -> bool:
             self._add_diagnostic(
-                line,
-                column,
-                f"Parse error: {str(e)}",
-                DiagnosticSeverity.Error,
+                error,
+                message=f"Parse error: {str(error)}",
             )
+
             return True
 
         return _on_parse_error
 
+    def _load_document_grammar(self) -> None:
+        # There are some error that are not caught during parsing,
+        # but they are caught during grammar loading using Lark's internal
+        # mechanisms with Lark class.
+        Lark(
+            self.source,
+            parser="lalr",
+            start="start",
+            source_path=str(self.uri),
+        )
+
     def _parse_grammar(self) -> None:
         """Parse the Lark grammar and extract basic structure."""
-        lark_parser = Lark.open_from_package(
-            "lark",
-            "grammars/lark.lark",
-            parser="lalr",
-        )
-        self._parsed_tree = lark_parser.parse(
+        self._parsed_tree = PARSER.parse(
             self.source,
             on_error=self._on_parse_error_handler(),
         )
 
-    def _extract_symbols(self) -> None:
+    def _build_ast(self) -> None:
+        """Transform the parse tree into an AST."""
+        if self._parsed_tree:
+            self._ast = AST_BUILDER.build(self._parsed_tree)
+
+    def _collect_definitions(self) -> None:
         """Extract rules, terminals, and imports from the source."""
-        if self._parsed_tree:
-            self._symbol_table.visit_topdown(self._parsed_tree)
+        if self._ast:
+            self._symbol_table.collect_definitions(self._ast)
 
-    def _find_references(self) -> None:
-        """Find all references to rules and terminals."""
-        if self._parsed_tree:
-            symbols = [
-                Symbol(token)
-                for token in list(
-                    self._parsed_tree.scan_values(
-                        lambda v: isinstance(v, Token) and v.type in ("RULE", "TOKEN")
-                    )
-                )
-            ]
+    def _validate_definitions(self) -> None:
+        self._symbol_table.validate_definitions()
 
-            import_path_symbols = [
-                symbol
-                for import_statement in self._parsed_tree.find_pred(
-                    lambda t: t.data in ("import", "multi_import")
-                )
-                for symbol in self._extract_symbols_from_import_path(import_statement)
-            ]
-
-            for symbol in symbols:
-                if symbol in import_path_symbols:
-                    continue
-
-                if symbol.name not in self._references:
-                    self._references[symbol.name] = []
-
-                self._references[symbol.name].append(symbol)
-
-    def _extract_symbols_from_import_path(self, tree: Tree) -> list[Symbol]:
-        if tree.data not in ("import", "multi_import"):
-            return []
-
-        import_path, alias = tree.children
-
-        if tree.data == "multi_import":
-            alias = None
-
-        import_path_tokens = list(
-            import_path.scan_values(
-                lambda v: isinstance(v, Token) and v.type in ("RULE", "TOKEN")
+        for error, _ in self._symbol_table.definition_errors:
+            self._add_diagnostic(
+                error,
+                message=str(error),
             )
-        )
 
-        if alias is None:
-            import_path_tokens = import_path_tokens[:-1]
-
-        return [Symbol(token) for token in import_path_tokens]
+    def _collect_references(self) -> None:
+        if self._ast:
+            self._symbol_table.collect_references(self._ast)
 
     def _validate_references(self) -> None:
-        """Validate that all referenced symbols are defined."""
-        defined_symbols = self._symbol_table.symbols.keys()
-        referenced_symbols = self._references.keys()
+        self._symbol_table.validate_references()
 
-        for symbol_name in referenced_symbols:
-            if symbol_name not in defined_symbols:
-                for symbol in self._references[symbol_name]:
-                    self._add_diagnostic(
-                        symbol.position.line,
-                        symbol.position.column,
-                        f"Undefined {symbol.kind} '{symbol.name}'",
-                        DiagnosticSeverity.Error,
-                    )
+        for error, *_ in self._symbol_table.reference_errors:
+            self._add_diagnostic(
+                error,
+                message=str(error),
+            )
 
     def _add_diagnostic(
-        self, line: int, col: int, message: str, severity: DiagnosticSeverity
+        self,
+        error: Exception,
+        severity: Optional[DiagnosticSeverity] = DiagnosticSeverity.Error,
+        message: Optional[str] = None,
     ) -> None:
         """Add a diagnostic to the list."""
         # Ensure line and column are within bounds
-        line = max(0, line)
-        line = min(line, len(self.lines) - 1)
+        line = max(0, getattr(error, "line", 0))
+        if self.lines:
+            line = min(line, len(self.lines) - 1)
+            line_text = self.lines[line]
+        else:
+            line = 0
+            line_text = ""
 
-        line_text = self.lines[line]
-
-        col = max(0, col)
+        col = max(0, getattr(error, "column", 0))
         col = min(col, len(line_text))
+
+        width = getattr(error, "width", 1)
 
         diagnostic = Diagnostic(
             range=Range(
                 start=Position(line=line, character=col),
-                end=Position(line=line, character=col + 1),
+                end=Position(line=line, character=col + width),
             ),
-            message=message,
+            message=(
+                message if message else str(error) + "\n" + str(error.__traceback__)
+            ),
             severity=severity,
-            source="lark-language-server",
+            source="lark-parser-language-server",
         )
         self._diagnostics.append(diagnostic)
 
@@ -210,15 +194,9 @@ class LarkDocument:
 
     def get_definition_location(self, symbol_name: str) -> Optional[Location]:
         """Get the definition location of a symbol."""
-        if symbol_name not in self._symbol_table.symbols:
-            return None
+        definition = self._symbol_table.get_definition(symbol_name)
 
-        symbol = self._symbol_table.symbols[symbol_name]
-
-        return Location(
-            uri=self.uri,
-            range=symbol.range.to_lsp_range(),
-        )
+        return definition.to_lsp_location(uri=self.uri) if definition else None
 
     def get_references(self, symbol_name: str) -> List[Location]:
         """Get all reference locations of a symbol."""
@@ -226,17 +204,16 @@ class LarkDocument:
             return []
 
         return [
-            Location(
-                uri=self.uri,
-                range=symbol.range.to_lsp_range(),
-            )
-            for symbol in self._references[symbol_name]
+            reference.to_lsp_location(uri=self.uri)
+            for reference in self._references[symbol_name]
         ]
 
     def get_document_symbols(self) -> List[DocumentSymbol]:
         """Get document symbols for outline view."""
         return [
-            symbol.to_lsp_symbol() for symbol in self._symbol_table.symbols.values()
+            definition.to_lsp_document_symbol()
+            for symbol_definitions in self._symbol_table.definitions.values()
+            for definition in symbol_definitions
         ]
 
     def get_completions(  # pylint: disable=unused-argument
@@ -244,40 +221,14 @@ class LarkDocument:
     ) -> List[CompletionItem]:
         """Get completion suggestions at the given position."""
         completions = [
-            CompletionItem(
-                label=symbol.name,
-                kind=(
-                    CompletionItemKind.Function
-                    if symbol.is_rule
-                    else CompletionItemKind.Variable
-                ),
-                detail=symbol.kind.capitalize(),
-                documentation=(
-                    f"Grammar rule: {symbol.name}"
-                    if symbol.is_rule
-                    else f"Grammar terminal: {symbol.name}"
-                ),
-            )
-            for symbol in self._symbol_table.symbols.values()
+            definition.to_lsp_completion_item()
+            for definitions in self._symbol_table.definitions.values()
+            for definition in definitions
         ]
 
-        # Add Lark keywords and operators
-        keywords = [
-            "start",
-            "import",
-            "ignore",
-            "override",
-            "extend",
-            "declare",
-        ]
-        for keyword in keywords:
+        for keyword in KEYWORDS:
             completions.append(
-                CompletionItem(
-                    label=keyword,
-                    kind=CompletionItemKind.Keyword,
-                    detail="Keyword",
-                    documentation=f"Lark keyword: {keyword}",
-                )
+                keyword.to_lsp_completion_item(),
             )
 
         return completions
@@ -291,18 +242,57 @@ class LarkDocument:
 
         symbol_name, start_column, end_column = symbol_info
 
-        symbol = self._symbol_table.symbols.get(symbol_name, None)
+        symbols = self._symbol_table[symbol_name]
 
-        if symbol is None:
+        if symbols is None:
             return None
 
-        return Hover(
-            contents=MarkupContent(
-                kind=MarkupKind.Markdown,
-                value=symbol.documentation,
-            ),
-            range=Range(
+        symbol = symbols[0]
+
+        return symbol.to_lsp_hover_info(
+            range_=Range(
                 start=Position(line=line, character=start_column),
                 end=Position(line=line, character=end_column),
+            )
+        )
+
+    def format(
+        self, options: FormattingOptions
+    ) -> TextEdit:  # pylint: disable=unused-argument
+        """Format the document according to the given options."""
+        if self._ast:
+            # {"tabSize":4,"insertSpaces":true,"trimTrailingWhitespace":true,"trimFinalNewlines":true,"insertFinalNewline":true}
+            tab_size = options.tab_size
+            insert_spaces = options.insert_spaces
+            insert_final_newline = options.insert_final_newline
+
+            indent = " " * tab_size if insert_spaces else "\t"
+
+            new_text = FORMATTER.format(self._ast, indent=indent) + (
+                "\n" if insert_final_newline else ""
+            )
+
+            lines = new_text.split("\n")
+
+            range_ = Range(
+                start=Position(
+                    line=0,
+                    character=0,
+                ),
+                end=Position(
+                    line=len(lines),
+                    character=len(lines[-1]),
+                ),
+            )
+            return TextEdit(
+                new_text=new_text,
+                range=range_,
+            )
+
+        return TextEdit(
+            new_text=self.source,
+            range=Range(
+                start=Position(line=0, character=0),
+                end=Position(line=len(self.source.split("\n")) + 1, character=0),
             ),
         )

@@ -1,0 +1,157 @@
+// Lark grammar of Lark's syntax
+//
+// Authors:
+//   - Martin Vuelta <martin.vuelta@dynova.io>
+//   - Dynova Development Team <dev@dynova.io>
+//
+// Notes:
+// - Lark is not bootstrapped, its parser is implemented in load_grammar.py
+// - This grammar is used to parse Lark files, including itself and is based
+//   on the Lark grammar from load_grammar.py.
+// - This grammar does not ignore comments as they are needed for the language
+//   server to propper formatting and provide code actions.
+
+start: _list
+
+_list:  _item
+    | _list _item
+
+_item:  rule
+    | term
+    | ignore
+    | import
+    | declare
+    | override
+    | extend
+    | comment
+    | _NL
+
+rule: rule_modifiers RULE template_params priority _COLON expansions
+
+rule_modifiers: [RULE_MODIFIERS]
+
+priority: [_DOT NUMBER]
+
+template_params: [_LBRACE _template_params _RBRACE]
+
+_template_params: RULE
+    | _template_params _COMMA RULE
+
+expansions: _expansions
+
+_expansions: alias
+    | _expansions _OR alias
+    | _expansions _NL_OR alias
+
+?alias:     expansion _TO nonterminal
+    | expansion
+
+expansion: _expansion
+
+_expansion: [_expansion expr]
+
+expr: atom [OP | TILDE NUMBER [_DOTDOT NUMBER]]
+
+?atom: _LPAR expansions _RPAR
+    | maybe
+    | value
+
+value: terminal
+    | nonterminal
+    | literal
+    | range
+    | template_usage
+
+terminal: TERMINAL
+
+nonterminal: RULE
+
+?name: RULE
+    | TERMINAL
+
+?symbol: terminal
+    | nonterminal
+
+maybe: _LBRA expansions _RBRA
+
+range: STRING _DOTDOT STRING
+
+template_usage: nonterminal _LBRACE _template_args _RBRACE
+
+_template_args: value
+    | _template_args _COMMA value
+
+term: TERMINAL _COLON expansions
+    | TERMINAL _DOT NUMBER _COLON expansions
+
+override: _OVERRIDE rule
+    | _OVERRIDE term
+
+extend: _EXTEND rule
+    | _EXTEND term
+
+ignore: _IGNORE expansions
+
+declare: _DECLARE _declare_args
+
+import: _IMPORT _import_path
+    | _IMPORT _import_path _LPAR name_list _RPAR
+    | _IMPORT _import_path _TO name
+
+_import_path: import_lib
+    | import_rel
+
+import_lib: _import_args
+
+import_rel: _DOT _import_args
+
+_import_args: name
+    | _import_args _DOT name
+
+name_list: _name_list
+
+_name_list: name
+    | _name_list _COMMA name
+
+_declare_args: symbol
+    | _declare_args symbol
+
+literal: REGEXP
+    | STRING
+
+comment: COMMENT
+
+// Lexer rules
+_LPAR: /\(/
+_RPAR: /\)/
+_LBRA: /\[/
+_RBRA: /\]/
+_LBRACE: /\{/
+_RBRACE: /\}/
+OP: /[+*]|[?](?![a-z_])/
+_COLON: ":"
+_COMMA: ","
+_OR: /\|/
+_DOT: /\.(?!\.)/
+_DOTDOT: /\.\./
+TILDE: "~"
+RULE_MODIFIERS: /(!|![?]?|[?]!?)(?=[_a-z])/
+RULE: /_?[a-z][_a-z0-9]*/
+TERMINAL: /_?[A-Z][_A-Z0-9]*/
+STRING: /"(?:[^"\n\\]|\\.)*"i?/
+REGEXP: /\/(?!\/)(\\\/|\\\\|[^\/\n])*\/[imslux]*/
+_NL: /(\r?\n)+\s*/
+_NL_OR: /(\r?\n)+\s*\|/
+WS: /[ \t]+/
+COMMENT: /(\/\/|#)[^\n]*/
+BACKSLASH: /\\[ ]*\n/
+_TO: "->"
+_IGNORE: /%ignore/
+_OVERRIDE: /%override/
+_DECLARE: /%declare/
+_EXTEND: /%extend/
+_IMPORT: /%import/
+NUMBER: /[+-]?\d+/
+
+%ignore WS
+%ignore BACKSLASH
