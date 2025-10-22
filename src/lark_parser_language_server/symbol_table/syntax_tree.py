@@ -162,7 +162,6 @@ def references_from_declare(
 def references_from_ignore(
     ignore: Ignore, ast_node: Optional[AstNode] = None
 ) -> list[Reference]:
-    ast_node = ignore
     if ast_node is None:
         ast_node = ignore
 
