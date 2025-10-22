@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-10-22
+
 ### Major Architecture & Infrastructure Improvements
 
 * **Complete Symbol Table Reorganization**
