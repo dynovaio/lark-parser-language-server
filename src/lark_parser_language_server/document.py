@@ -8,6 +8,7 @@ from lsprotocol.types import (
     Diagnostic,
     DiagnosticSeverity,
     DocumentSymbol,
+    FormattingOptions,
     Hover,
     Location,
     Position,
@@ -252,13 +253,33 @@ class LarkDocument:
             )
         )
 
-    def format(self, options) -> TextEdit:  # pylint: disable=unused-argument
+    def format(
+        self, options: FormattingOptions
+    ) -> TextEdit:  # pylint: disable=unused-argument
         """Format the document according to the given options."""
         if self._ast:
-            new_text = FORMATTER.format(self._ast)
+            # {"tabSize":4,"insertSpaces":true,"trimTrailingWhitespace":true,"trimFinalNewlines":true,"insertFinalNewline":true}
+            tab_size = options.tab_size
+            insert_spaces = options.insert_spaces
+            insert_final_newline = options.insert_final_newline
+
+            indent = " " * tab_size if insert_spaces else "\t"
+
+            new_text = FORMATTER.format(self._ast, indent=indent) + (
+                "\n" if insert_final_newline else ""
+            )
+
+            lines = new_text.split("\n")
+
             range_ = Range(
-                start=Position(line=0, character=0),
-                end=Position(line=len(new_text.split("\n")) + 1, character=0),
+                start=Position(
+                    line=0,
+                    character=0,
+                ),
+                end=Position(
+                    line=len(lines),
+                    character=len(lines[-1]),
+                ),
             )
             return TextEdit(
                 new_text=new_text,
