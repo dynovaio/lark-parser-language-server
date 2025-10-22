@@ -1,506 +1,591 @@
-"""Tests for symbol table functionality."""
+"""Tests for lark_parser_language_server.symbol_table module."""
 
-from lark import Token, Tree
-from lsprotocol.types import SymbolKind
+from unittest.mock import Mock, patch
 
-from lark_parser_language_server.symbol_table import (
-    Symbol,
-    SymbolModifier,
-    SymbolPosition,
-    SymbolRange,
-    SymbolTable,
+import pytest
+
+from lark_parser_language_server.symbol_table import SymbolTable
+from lark_parser_language_server.symbol_table.errors import (
+    DefinitionNotFoundError,
+    DefinitionNotFoundForReferenceError,
+    MultipleDefinitionsError,
+    ShadowedDefinitionError,
 )
+from lark_parser_language_server.symbol_table.flags import Kind, Modifiers
+from lark_parser_language_server.symbol_table.symbol import (
+    Definition,
+    Position,
+    Range,
+    Reference,
+)
+from lark_parser_language_server.syntax_tree.nodes import Ast, Import, Rule, Term
 
 
-class TestSymbolModifier:
-    """Test SymbolModifier functionality."""
+def create_mock_definition(name="test_def", kind=Kind.RULE, line=1, column=1):
+    """Helper to create a mock Definition."""
+    position = Position(line=line, column=column)
+    range_obj = Range(
+        start=position, end=Position(line=line, column=column + len(name))
+    )
 
-    def test_symbol_modifier_mapping(self):
-        """Test symbol modifier character mapping."""
-        assert SymbolModifier.map("_") == SymbolModifier.INLINED
-        assert SymbolModifier.map("?") == SymbolModifier.CONDITIONALLY_INLINED
-        assert SymbolModifier.map("!") == SymbolModifier.PINNED
-        assert SymbolModifier.map("x") == SymbolModifier(0)  # Unknown character
-
-
-class TestSymbolPosition:
-    """Test SymbolPosition functionality."""
-
-    def test_symbol_position_from_token(self):
-        """Test creating SymbolPosition from token."""
-        token = Token("RULE", "test_rule")
-        token.line = 5
-        token.column = 10
-
-        pos = SymbolPosition.from_token(token)
-        assert pos.line == 4  # 0-based
-        assert pos.column == 9  # 0-based
-
-    def test_symbol_position_from_token_with_modifiers(self):
-        """Test creating SymbolPosition from token with modifiers."""
-        token = Token("RULE", "?!test_rule")
-        token.line = 5
-        token.column = 10
-
-        pos = SymbolPosition.from_token(token, use_clean_name=True)
-        assert pos.line == 4  # 0-based
-        assert pos.column == 11  # 0-based + offset for modifiers
-
-    def test_symbol_position_no_line_column(self):
-        """Test creating SymbolPosition when token has no line/column."""
-        token = Token("RULE", "test_rule")
-        # Don't set line/column
-
-        pos = SymbolPosition.from_token(token)
-        assert pos.line == 0
-        assert pos.column == 0
-
-    def test_to_lsp_position(self):
-        """Test converting to LSP Position."""
-        pos = SymbolPosition(line=5, column=10)
-        lsp_pos = pos.to_lsp_position()
-        assert lsp_pos.line == 5
-        assert lsp_pos.character == 10
+    definition = Mock(spec=Definition)
+    definition.name = name
+    definition.kind = kind
+    definition.selection_range = range_obj
+    definition.range = range_obj
+    definition.children = {}
+    return definition
 
 
-class TestSymbolRange:
-    """Test SymbolRange functionality."""
+def create_mock_reference(name="test_ref", line=1, column=1, ast_node=None):
+    """Helper to create a mock Reference."""
+    position = Position(line=line, column=column)
+    range_obj = Range(
+        start=position, end=Position(line=line, column=column + len(name))
+    )
 
-    def test_symbol_range_from_token(self):
-        """Test creating SymbolRange from token."""
-        token = Token("RULE", "test_rule")
-        token.line = 5
-        token.column = 10
-
-        range_obj = SymbolRange.from_token(token)
-        assert range_obj.start.line == 4
-        assert range_obj.start.column == 9
-        assert range_obj.end.line == 4
-        assert range_obj.end.column == 18  # start + length
-
-    def test_symbol_range_from_tree_no_tokens(self):
-        """Test creating SymbolRange from tree with no tokens."""
-        tree = Tree("start", [])
-
-        try:
-            SymbolRange.from_tree(tree)
-            assert False, "Should raise ValueError"
-        except ValueError as e:
-            assert "does not contain any tokens" in str(e)
-
-    def test_symbol_range_from_tree_with_tokens(self):
-        """Test creating SymbolRange from tree with tokens."""
-        token1 = Token("RULE", "start")
-        token1.line = 1
-        token1.column = 1
-
-        token2 = Token("TOKEN", "END")
-        token2.line = 1
-        token2.column = 10
-
-        tree = Tree("start", [token1, token2])
-
-        range_obj = SymbolRange.from_tree(tree)
-        assert range_obj.start.line == 0  # 0-based
-        assert range_obj.start.column == 0  # 0-based
-        assert range_obj.end.line == 0
-        assert range_obj.end.column == 12  # position + length of "END" minus 1
+    reference = Mock(spec=Reference)
+    reference.name = name
+    reference.position = position
+    reference.range = range_obj
+    reference.ast_node = ast_node
+    return reference
 
 
-class TestSymbol:
-    """Test Symbol functionality."""
-
-    def test_symbol_creation(self):
-        """Test creating a symbol."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token)
-        assert symbol.name == "test_rule"
-        assert symbol.kind == "rule"
-        assert symbol.is_rule is True
-        assert symbol.is_terminal is False
-
-    def test_symbol_with_modifiers(self):
-        """Test symbol with modifiers."""
-        token = Token("RULE", "?!_test_rule")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token)
-        assert symbol.name == "_test_rule"  # Only strips ? and ! not _
-        assert symbol.is_conditionally_inlined is True
-        assert symbol.is_pinned is True
-        assert symbol.is_inlined is True
-
-    def test_symbol_terminal(self):
-        """Test terminal symbol."""
-        token = Token("TOKEN", "TEST_TOKEN")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token)
-        assert symbol.name == "TEST_TOKEN"
-        assert symbol.kind == "terminal"
-        assert symbol.is_rule is False
-        assert symbol.is_terminal is True
-
-    def test_symbol_invalid_name(self):
-        """Test symbol with invalid name."""
-        token = Token("TOKEN", "Mixed_Case_Invalid")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token)
-        try:
-            _ = symbol.kind
-            assert False, "Should raise ValueError"
-        except ValueError as e:
-            assert "Invalid symbol name" in str(e)
-
-    def test_symbol_alias(self):
-        """Test symbol with alias flag."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token, alias=True)
-        assert symbol.is_alias is True
-
-    def test_symbol_directive(self):
-        """Test symbol with directive."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token, directive="import")
-        assert symbol._directive == "import"
-        assert "Import" in symbol.description
-
-    def test_symbol_equality(self):
-        """Test symbol equality."""
-        token1 = Token("RULE", "test_rule")
-        token1.line = 1
-        token1.column = 1
-
-        token2 = Token("RULE", "test_rule")
-        token2.line = 1
-        token2.column = 1
-
-        symbol1 = Symbol(token1)
-        symbol2 = Symbol(token2)
-
-        assert symbol1 == symbol2
-
-    def test_symbol_inequality_with_non_symbol(self):
-        """Test symbol inequality with non-symbol object."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token)
-
-        assert symbol != "not_a_symbol"
-
-    def test_symbol_repr(self):
-        """Test symbol string representation."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token)
-        repr_str = repr(symbol)
-        assert "Symbol" in repr_str
-        assert "test_rule" in repr_str
-
-    def test_symbol_documentation(self):
-        """Test symbol documentation."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token)
-        doc = symbol.documentation
-        assert "Grammar rule definition" in doc
-        assert "test_rule" in doc
-
-    def test_symbol_get_lsp_kind(self):
-        """Test getting LSP symbol kind."""
-        # Rule symbol
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-        symbol = Symbol(token)
-        assert symbol.get_lsp_kind() == SymbolKind.Function
-
-        # Terminal symbol
-        token = Token("TOKEN", "TEST_TOKEN")
-        token.line = 1
-        token.column = 1
-        symbol = Symbol(token)
-        assert symbol.get_lsp_kind() == SymbolKind.Constant
-
-    def test_symbol_to_lsp_symbol(self):
-        """Test converting to LSP DocumentSymbol."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-
-        symbol = Symbol(token)
-        lsp_symbol = symbol.to_lsp_symbol()
-
-        assert lsp_symbol.name == "test_rule"
-        assert lsp_symbol.detail is not None
+def create_mock_ast(statements=None):
+    """Helper to create a mock Ast."""
+    ast = Mock(spec=Ast)
+    ast.statements = statements or []
+    return ast
 
 
 class TestSymbolTable:
-    """Test SymbolTable functionality."""
+    """Test cases for SymbolTable class."""
 
-    def test_symbol_table_rule(self):
-        """Test symbol table with rule."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
-
-        tree = Tree("rule", [token])
-
+    def test_init(self):
+        """Test SymbolTable initialization."""
         symbol_table = SymbolTable()
-        symbol_table.rule(tree)
 
-        assert "test_rule" in symbol_table.symbols
+        assert symbol_table.definitions == {}
+        assert symbol_table.references == {}
+        assert symbol_table.definition_errors == []
+        assert symbol_table.reference_errors == []
+        assert symbol_table._all_references == []
+        assert symbol_table._all_definitions == []
 
-    def test_symbol_table_token(self):
-        """Test symbol table with token."""
-        token = Token("TOKEN", "TEST_TOKEN")
-        token.line = 1
-        token.column = 1
-
-        tree = Tree("token", [token])
-
+    def test_getitem(self):
+        """Test __getitem__ method."""
         symbol_table = SymbolTable()
-        symbol_table.token(tree)
+        definition = create_mock_definition("test_rule")
+        symbol_table.definitions["test_rule"] = [definition]
 
-        assert "TEST_TOKEN" in symbol_table.symbols
+        # Test existing definition
+        result = symbol_table["test_rule"]
+        assert result == [definition]
 
-    def test_symbol_table_alias(self):
-        """Test symbol table with alias."""
-        token = Token("RULE", "alias_name")
-        token.line = 1
-        token.column = 1
+        # Test non-existing definition
+        result = symbol_table["non_existent"]
+        assert result is None
 
-        tree = Tree("alias", [None, token])  # Alias tree has target first, then alias
-
+    def test_contains(self):
+        """Test __contains__ method."""
         symbol_table = SymbolTable()
-        symbol_table.alias(tree)
+        definition = create_mock_definition("test_rule")
+        symbol_table.definitions["test_rule"] = [definition]
 
-        assert "alias_name" in symbol_table.symbols
+        # Test existing definition
+        assert "test_rule" in symbol_table
 
-    def test_symbol_table_alias_no_alias(self):
-        """Test symbol table with alias tree but no alias token."""
-        tree = Tree("alias", [None])  # No alias token
+        # Test non-existing definition
+        assert "non_existent" not in symbol_table
 
+    def test_register_definition(self):
+        """Test _register_definition method."""
         symbol_table = SymbolTable()
-        symbol_table.alias(tree)
+        definition1 = create_mock_definition("test_rule")
+        definition2 = create_mock_definition("test_rule")
 
-        # Should not crash, just do nothing
-        assert len(symbol_table.symbols) == 0
+        # Register first definition
+        symbol_table._register_definition(definition1)
+        assert "test_rule" in symbol_table.definitions
+        assert len(symbol_table.definitions["test_rule"]) == 1
+        assert symbol_table.definitions["test_rule"][0] is definition1
 
-    def test_symbol_table_getitem(self):
-        """Test symbol table getitem."""
-        token = Token("RULE", "test_rule")
-        token.line = 1
-        token.column = 1
+        # Register second definition with same name
+        symbol_table._register_definition(definition2)
+        assert len(symbol_table.definitions["test_rule"]) == 2
+        assert symbol_table.definitions["test_rule"][1] is definition2
 
-        tree = Tree("rule", [token])
-
+    def test_register_definition_error(self):
+        """Test _register_definition_error method."""
         symbol_table = SymbolTable()
-        symbol_table.rule(tree)
+        error = MultipleDefinitionsError("test_rule")
+        definition = create_mock_definition("test_rule")
 
-        # Test successful lookup
-        symbol = symbol_table["test_rule"]
-        assert symbol.name == "test_rule"
+        symbol_table._register_definition_error(error, definition)
 
-        # Test with modifiers
-        symbol = symbol_table["?!test_rule"]
-        assert symbol.name == "test_rule"
+        assert len(symbol_table.definition_errors) == 1
+        assert symbol_table.definition_errors[0] == (error, definition)
 
-        # Test missing symbol
-        try:
-            _ = symbol_table["missing_rule"]
-            assert False, "Should raise KeyError"
-        except KeyError:
-            pass
-
-    def test_symbol_table_import(self):
-        """Test symbol table with import statement."""
-        # Create import path tokens
-        name_token1 = Token("RULE", "common")
-        name_token1.line = 1
-        name_token1.column = 1
-
-        name_token2 = Token("TOKEN", "WORD")
-        name_token2.line = 1
-        name_token2.column = 8
-
-        # Create import path tree
-        name_tree1 = Tree("name", [name_token1])
-        name_tree2 = Tree("name", [name_token2])
-        import_path = Tree("import_path", [name_tree1, Token("DOT", "."), name_tree2])
-
-        # Test import without alias
-        import_tree = Tree("import", [import_path, None])
-
+    def test_register_definition_error_no_definition(self):
+        """Test _register_definition_error method without definition."""
         symbol_table = SymbolTable()
-        symbol_table._handle_import(import_tree)
+        error = DefinitionNotFoundError("missing_rule")
 
-        assert "WORD" in symbol_table.symbols
+        symbol_table._register_definition_error(error)
 
-    def test_symbol_table_import_with_alias(self):
-        """Test symbol table with import statement with alias."""
-        # Create import path tokens
-        name_token1 = Token("RULE", "common")
-        name_token1.line = 1
-        name_token1.column = 1
+        assert len(symbol_table.definition_errors) == 1
+        assert symbol_table.definition_errors[0] == (error, None)
 
-        name_token2 = Token("TOKEN", "WORD")
-        name_token2.line = 1
-        name_token2.column = 8
-
-        alias_token = Token("TOKEN", "MY_WORD")
-        alias_token.line = 1
-        alias_token.column = 15
-
-        # Create trees
-        name_tree1 = Tree("name", [name_token1])
-        name_tree2 = Tree("name", [name_token2])
-        import_path = Tree("import_path", [name_tree1, Token("DOT", "."), name_tree2])
-        alias_tree = Tree("alias", [alias_token])
-
-        # Test import with alias
-        import_tree = Tree("import", [import_path, alias_tree])
-
+    def test_register_reference(self):
+        """Test _register_reference method."""
         symbol_table = SymbolTable()
-        symbol_table._handle_import(import_tree)
+        reference1 = create_mock_reference("test_rule")
+        reference2 = create_mock_reference("test_rule")
 
-        assert "MY_WORD" in symbol_table.symbols
+        # Register first reference
+        symbol_table._register_reference(reference1)
+        assert "test_rule" in symbol_table.references
+        assert len(symbol_table.references["test_rule"]) == 1
+        assert symbol_table.references["test_rule"][0] is reference1
 
-    def test_symbol_table_multi_import(self):
-        """Test symbol table with multi import statement."""
-        # Create import path
-        name_token1 = Token("RULE", "common")
-        name_token1.line = 1
-        name_token1.column = 1
+        # Register second reference with same name
+        symbol_table._register_reference(reference2)
+        assert len(symbol_table.references["test_rule"]) == 2
+        assert symbol_table.references["test_rule"][1] is reference2
 
-        import_path = Tree("import_path", [Tree("name", [name_token1])])
-
-        # Create name list
-        name_token2 = Token("TOKEN", "WORD")
-        name_token2.line = 1
-        name_token2.column = 8
-
-        name_token3 = Token("TOKEN", "NUMBER")
-        name_token3.line = 1
-        name_token3.column = 15
-
-        name_list = Tree(
-            "name_list", [Tree("name", [name_token2]), Tree("name", [name_token3])]
-        )
-
-        multi_import_tree = Tree("multi_import", [import_path, name_list])
-
+    def test_register_reference_error(self):
+        """Test _register_reference_error method."""
         symbol_table = SymbolTable()
-        symbol_table._handle_multi_import(multi_import_tree)
+        error = DefinitionNotFoundForReferenceError("undefined_rule")
+        reference = create_mock_reference("undefined_rule")
+        definition = create_mock_definition("undefined_rule")
 
-        assert "WORD" in symbol_table.symbols
-        assert "NUMBER" in symbol_table.symbols
+        symbol_table._register_reference_error(error, reference, definition)
 
-    def test_symbol_table_declare(self):
-        """Test symbol table with declare statement."""
-        name_token1 = Token("RULE", "declared_rule")
-        name_token1.line = 1
-        name_token1.column = 1
+        assert len(symbol_table.reference_errors) == 1
+        assert symbol_table.reference_errors[0] == (error, reference, definition)
 
-        name_token2 = Token("TOKEN", "DECLARED_TOKEN")
-        name_token2.line = 1
-        name_token2.column = 15
-
-        declare_tree = Tree(
-            "declare", [Tree("name", [name_token1]), Tree("name", [name_token2])]
-        )
-
+    def test_register_reference_error_minimal(self):
+        """Test _register_reference_error method with minimal parameters."""
         symbol_table = SymbolTable()
-        symbol_table._handle_declare(declare_tree)
+        error = DefinitionNotFoundForReferenceError("undefined_rule")
 
-        assert "declared_rule" in symbol_table.symbols
-        assert "DECLARED_TOKEN" in symbol_table.symbols
+        symbol_table._register_reference_error(error)
 
-    def test_symbol_table_consume_symbol_non_token(self):
-        """Test _consume_symbol with non-token branch."""
-        tree = Tree("test", [])
-        branch = Tree("not_a_token", [])  # Tree instead of Token
+        assert len(symbol_table.reference_errors) == 1
+        assert symbol_table.reference_errors[0] == (error, None, None)
 
+    def test_get_rule_definitions(self):
+        """Test get_rule_definitions method."""
         symbol_table = SymbolTable()
-        symbol_table._consume_symbol(tree, branch)
+        rule_def1 = create_mock_definition("rule1", kind=Kind.RULE)
+        rule_def2 = create_mock_definition("rule2", kind=Kind.RULE)
+        terminal_def = create_mock_definition("TERMINAL", kind=Kind.TERMINAL)
 
-        # Should not add anything since branch is not a Token
-        assert len(symbol_table.symbols) == 0
+        symbol_table.definitions["rule1"] = [rule_def1]
+        symbol_table.definitions["rule2"] = [rule_def2]
+        symbol_table.definitions["TERMINAL"] = [terminal_def]
 
-    def test_symbol_no_modifiers_extraction(self):
-        """Test symbol with no modifiers to cover _extract_modifiers branch."""
-        token = Token("RULE", "simple_rule")
-        token.line = 1
-        token.column = 1
+        rule_definitions = symbol_table.get_rule_definitions()
 
-        symbol = Symbol(token)
+        assert len(rule_definitions) == 2
+        assert rule_def1 in rule_definitions
+        assert rule_def2 in rule_definitions
+        assert terminal_def not in rule_definitions
 
-        # Should have no modifiers (SymbolModifier with value 0)
-        assert symbol.modifiers == SymbolModifier(0)
+    def test_get_terminal_definitions(self):
+        """Test get_terminal_definitions method."""
+        symbol_table = SymbolTable()
+        rule_def = create_mock_definition("rule", kind=Kind.RULE)
+        terminal_def1 = create_mock_definition("TERMINAL1", kind=Kind.TERMINAL)
+        terminal_def2 = create_mock_definition("TERMINAL2", kind=Kind.TERMINAL)
 
-    def test_symbol_description_with_directive(self):
-        """Test symbol description with directive."""
-        token = Token("RULE", "rule_with_directive")
-        token.line = 1
-        token.column = 1
+        symbol_table.definitions["rule"] = [rule_def]
+        symbol_table.definitions["TERMINAL1"] = [terminal_def1]
+        symbol_table.definitions["TERMINAL2"] = [terminal_def2]
 
-        symbol = Symbol(token, directive="test directive")
-        desc = symbol.description
+        terminal_definitions = symbol_table.get_terminal_definitions()
 
-        assert "Test directive" in desc
+        assert len(terminal_definitions) == 2
+        assert terminal_def1 in terminal_definitions
+        assert terminal_def2 in terminal_definitions
+        assert rule_def not in terminal_definitions
 
-    def test_symbol_description_with_inlined_flag(self):
-        """Test symbol description with inlined flag."""
-        token = Token("RULE", "_inline_rule")  # Underscore prefix makes it inlined
-        token.line = 1
-        token.column = 1
+    def test_get_all_definitions_basic(self):
+        """Test get_all_definitions method with basic definitions."""
+        symbol_table = SymbolTable()
+        rule_def = create_mock_definition("rule", kind=Kind.RULE)
+        terminal_def = create_mock_definition("TERMINAL", kind=Kind.TERMINAL)
 
-        symbol = Symbol(token)
-        desc = symbol.description
+        symbol_table.definitions["rule"] = [rule_def]
+        symbol_table.definitions["TERMINAL"] = [terminal_def]
 
-        assert "Inlined" in desc
+        all_definitions = symbol_table.get_all_definitions()
 
-    def test_symbol_description_with_conditional_inline_flag(self):
-        """Test symbol description with conditional inline flag."""
-        token = Token(
-            "RULE", "?cond_inline_rule"
-        )  # Question mark prefix makes it conditionally inlined
-        token.line = 1
-        token.column = 1
+        assert len(all_definitions) == 2
+        assert rule_def in all_definitions
+        assert terminal_def in all_definitions
 
-        symbol = Symbol(token)
-        desc = symbol.description
+    def test_get_all_definitions_with_template_parameters(self):
+        """Test get_all_definitions method with template parameters."""
+        symbol_table = SymbolTable()
 
-        assert "Conditionally Inlined" in desc
+        # Create a rule definition with children (template parameters)
+        rule_def = create_mock_definition("template_rule", kind=Kind.RULE)
+        param_def = create_mock_definition("param1", kind=Kind.RULE)
+        rule_def.children = {"param1": [param_def]}
 
-    def test_symbol_description_multiple_flags(self):
-        """Test symbol description with multiple flags and directive."""
-        token = Token("RULE", "_?multi_flag_rule")  # Both underscore and question mark
-        token.line = 1
-        token.column = 1
+        symbol_table.definitions["template_rule"] = [rule_def]
 
-        symbol = Symbol(token, directive="complex directive")
-        desc = symbol.description
+        all_definitions = symbol_table.get_all_definitions()
 
-        assert "Complex directive" in desc
-        assert "Inlined" in desc
-        assert "Conditionally Inlined" in desc
+        # Should include both the rule and its parameter
+        assert len(all_definitions) >= 1
+        assert rule_def in all_definitions
+
+    def test_get_all_definitions_cached(self):
+        """Test get_all_definitions method caching behavior."""
+        symbol_table = SymbolTable()
+        rule_def = create_mock_definition("rule", kind=Kind.RULE)
+        symbol_table.definitions["rule"] = [rule_def]
+
+        # First call
+        all_definitions1 = symbol_table.get_all_definitions()
+
+        # Second call should return the same cached result
+        all_definitions2 = symbol_table.get_all_definitions()
+
+        assert all_definitions1 is all_definitions2
+
+    def test_get_definition_direct_match(self):
+        """Test get_definition method with direct definition match."""
+        symbol_table = SymbolTable()
+        definition = create_mock_definition("test_rule")
+        symbol_table.definitions["test_rule"] = [definition]
+
+        result = symbol_table.get_definition("test_rule")
+        assert result is definition
+
+    def test_get_definition_no_match(self):
+        """Test get_definition method with no match."""
+        symbol_table = SymbolTable()
+
+        result = symbol_table.get_definition("non_existent")
+        assert result is None
+
+    def test_get_definition_from_rule_reference(self):
+        """Test get_definition method finding definition through rule reference."""
+        symbol_table = SymbolTable()
+
+        # Create a rule and its definition
+        rule_def = create_mock_definition("parent_rule")
+        symbol_table.definitions["parent_rule"] = [rule_def]
+
+        # Create a rule AST node and reference
+        rule_ast = Mock(spec=Rule)
+        rule_ast.name = Mock()
+        rule_ast.name.__str__ = Mock(return_value="parent_rule")
+
+        reference = create_mock_reference("param", ast_node=rule_ast)
+        symbol_table.references["param"] = [reference]
+
+        result = symbol_table.get_definition("param")
+        assert result is rule_def
+
+    def test_get_definition_from_import_reference(self):
+        """Test get_definition method finding definition through import reference."""
+        symbol_table = SymbolTable()
+
+        # Create an import alias and its definition
+        import_def = create_mock_definition("import_alias")
+        symbol_table.definitions["import_alias"] = [import_def]
+
+        # Create an import AST node and reference
+        import_ast = Mock(spec=Import)
+        import_ast.alias = Mock()
+        import_ast.alias.__str__ = Mock(return_value="import_alias")
+
+        reference = create_mock_reference("imported_symbol", ast_node=import_ast)
+        symbol_table.references["imported_symbol"] = [reference]
+
+        result = symbol_table.get_definition("imported_symbol")
+        assert result is import_def
+
+    def test_get_definition_import_no_alias(self):
+        """Test get_definition method with import reference but no alias."""
+        symbol_table = SymbolTable()
+
+        # Create an import AST node without alias
+        import_ast = Mock(spec=Import)
+        import_ast.alias = None
+
+        reference = create_mock_reference("imported_symbol", ast_node=import_ast)
+        symbol_table.references["imported_symbol"] = [reference]
+
+        result = symbol_table.get_definition("imported_symbol")
+        assert result is None
+
+    def test_get_all_references_basic(self):
+        """Test get_all_references method."""
+        symbol_table = SymbolTable()
+        reference1 = create_mock_reference("rule1")
+        reference2 = create_mock_reference("rule2")
+        reference3 = create_mock_reference("rule1")  # Another reference to rule1
+
+        symbol_table.references["rule1"] = [reference1, reference3]
+        symbol_table.references["rule2"] = [reference2]
+
+        all_references = symbol_table.get_all_references()
+
+        assert len(all_references) == 3
+        assert reference1 in all_references
+        assert reference2 in all_references
+        assert reference3 in all_references
+
+    def test_get_all_references_cached(self):
+        """Test get_all_references method caching behavior."""
+        symbol_table = SymbolTable()
+        reference = create_mock_reference("rule1")
+        symbol_table.references["rule1"] = [reference]
+
+        # First call
+        all_references1 = symbol_table.get_all_references()
+
+        # Second call should return the same cached result
+        all_references2 = symbol_table.get_all_references()
+
+        assert all_references1 is all_references2
+
+    @patch("lark_parser_language_server.symbol_table.definitions_from_ast_node")
+    def test_collect_definitions(self, mock_definitions_from_ast_node):
+        """Test collect_definitions method."""
+        symbol_table = SymbolTable()
+
+        # Create mock statements and definitions
+        statement1 = Mock()
+        statement2 = Mock()
+        ast = create_mock_ast([statement1, statement2])
+
+        definition1 = create_mock_definition("rule1")
+        definition2 = create_mock_definition("rule2")
+
+        # Mock the definitions_from_ast_node to return different definitions for each statement
+        mock_definitions_from_ast_node.side_effect = [[definition1], [definition2]]
+
+        symbol_table.collect_definitions(ast)
+
+        # Verify that definitions_from_ast_node was called for each statement
+        assert mock_definitions_from_ast_node.call_count == 2
+        mock_definitions_from_ast_node.assert_any_call(statement1)
+        mock_definitions_from_ast_node.assert_any_call(statement2)
+
+        # Verify that definitions were registered
+        assert "rule1" in symbol_table.definitions
+        assert "rule2" in symbol_table.definitions
+        assert symbol_table.definitions["rule1"][0] is definition1
+        assert symbol_table.definitions["rule2"][0] is definition2
+
+    @patch("lark_parser_language_server.symbol_table.validate_single_definition")
+    @patch("lark_parser_language_server.symbol_table.validate_shadowed_definition")
+    def test_validate_definitions(self, mock_validate_shadowed, mock_validate_single):
+        """Test validate_definitions method."""
+        symbol_table = SymbolTable()
+
+        # Add some regular definitions
+        rule_def = create_mock_definition("rule1", kind=Kind.RULE)
+        terminal_def = create_mock_definition("TERMINAL1", kind=Kind.TERMINAL)
+
+        symbol_table.definitions["rule1"] = [rule_def]
+        symbol_table.definitions["TERMINAL1"] = [terminal_def]
+
+        # Add a rule with children (template parameters)
+        template_rule = create_mock_definition("template_rule", kind=Kind.RULE)
+        param_def = create_mock_definition("param1")
+        template_rule.children = {"param1": [param_def]}
+        symbol_table.definitions["template_rule"] = [template_rule]
+
+        symbol_table.validate_definitions()
+
+        # Should validate single definition for each name (including child definitions)
+        expected_calls = len(symbol_table.definitions) + 1  # +1 for child definition
+        assert mock_validate_single.call_count == expected_calls
+
+        # Should validate shadowed definitions for child definitions
+        mock_validate_shadowed.assert_called()
+
+    @patch("lark_parser_language_server.symbol_table.references_from_ast_node")
+    def test_collect_references(self, mock_references_from_ast_node):
+        """Test collect_references method."""
+        symbol_table = SymbolTable()
+
+        # Create mock statements and references
+        statement1 = Mock()
+        statement2 = Mock()
+        ast = create_mock_ast([statement1, statement2])
+
+        reference1 = create_mock_reference("rule1")
+        reference2 = create_mock_reference("rule2")
+
+        # Mock the references_from_ast_node to return different references for each statement
+        mock_references_from_ast_node.side_effect = [[reference1], [reference2]]
+
+        symbol_table.collect_references(ast)
+
+        # Verify that references_from_ast_node was called for each statement
+        assert mock_references_from_ast_node.call_count == 2
+        mock_references_from_ast_node.assert_any_call(statement1)
+        mock_references_from_ast_node.assert_any_call(statement2)
+
+        # Verify that references were registered
+        assert "rule1" in symbol_table.references
+        assert "rule2" in symbol_table.references
+        assert symbol_table.references["rule1"][0] is reference1
+        assert symbol_table.references["rule2"][0] is reference2
+
+    @patch("lark_parser_language_server.symbol_table.validate_undefined_reference")
+    def test_validate_references(self, mock_validate_undefined):
+        """Test validate_references method."""
+        symbol_table = SymbolTable()
+
+        # Add some references
+        reference1 = create_mock_reference("rule1")
+        reference2 = create_mock_reference("rule2")
+
+        symbol_table.references["rule1"] = [reference1]
+        symbol_table.references["rule2"] = [reference2]
+
+        symbol_table.validate_references()
+
+        # Should validate undefined reference for each reference name
+        assert mock_validate_undefined.call_count == len(symbol_table.references)
+
+
+class TestSymbolTableIntegration:
+    """Integration tests for SymbolTable class."""
+
+    def test_complete_workflow(self):
+        """Test complete symbol table workflow."""
+        symbol_table = SymbolTable()
+
+        # Create some definitions and references
+        rule_def = create_mock_definition("main_rule", kind=Kind.RULE)
+        terminal_def = create_mock_definition("TOKEN", kind=Kind.TERMINAL)
+
+        # Register definitions
+        symbol_table._register_definition(rule_def)
+        symbol_table._register_definition(terminal_def)
+
+        # Create and register references
+        reference1 = create_mock_reference("main_rule")
+        reference2 = create_mock_reference("TOKEN")
+        reference3 = create_mock_reference("undefined_rule")
+
+        symbol_table._register_reference(reference1)
+        symbol_table._register_reference(reference2)
+        symbol_table._register_reference(reference3)
+
+        # Test various getter methods
+        assert len(symbol_table.get_rule_definitions()) == 1
+        assert len(symbol_table.get_terminal_definitions()) == 1
+        assert len(symbol_table.get_all_definitions()) == 2
+        assert len(symbol_table.get_all_references()) == 3
+
+        # Test definition lookup
+        assert symbol_table.get_definition("main_rule") is rule_def
+        assert symbol_table.get_definition("TOKEN") is terminal_def
+        assert symbol_table.get_definition("undefined_rule") is None
+
+    def test_error_collection(self):
+        """Test error collection functionality."""
+        symbol_table = SymbolTable()
+
+        # Test definition error registration
+        def_error = MultipleDefinitionsError("duplicate_rule")
+        definition = create_mock_definition("duplicate_rule")
+        symbol_table._register_definition_error(def_error, definition)
+
+        # Test reference error registration
+        ref_error = DefinitionNotFoundForReferenceError("undefined_rule")
+        reference = create_mock_reference("undefined_rule")
+        symbol_table._register_reference_error(ref_error, reference)
+
+        assert len(symbol_table.definition_errors) == 1
+        assert len(symbol_table.reference_errors) == 1
+        assert symbol_table.definition_errors[0] == (def_error, definition)
+        assert symbol_table.reference_errors[0] == (ref_error, reference, None)
+
+    def test_complex_definition_lookup(self):
+        """Test complex definition lookup scenarios."""
+        symbol_table = SymbolTable()
+
+        # Create a rule with template parameters
+        template_rule = create_mock_definition("template_rule", kind=Kind.RULE)
+        param_def = create_mock_definition("T")
+        template_rule.children = {"T": [param_def]}
+
+        symbol_table.definitions["template_rule"] = [template_rule]
+
+        # Create a reference within the template rule scope
+        rule_ast = Mock(spec=Rule)
+        rule_ast.name = Mock()
+        rule_ast.name.__str__ = Mock(return_value="template_rule")
+
+        param_reference = create_mock_reference("T", ast_node=rule_ast)
+        symbol_table.references["T"] = [param_reference]
+
+        # The definition lookup should find the template rule
+        result = symbol_table.get_definition("T")
+        assert result is template_rule
+
+    def test_empty_symbol_table(self):
+        """Test behavior with empty symbol table."""
+        symbol_table = SymbolTable()
+
+        assert symbol_table.get_rule_definitions() == []
+        assert symbol_table.get_terminal_definitions() == []
+        assert symbol_table.get_all_definitions() == []
+        assert symbol_table.get_all_references() == []
+        assert symbol_table.get_definition("any_name") is None
+        assert "any_name" not in symbol_table
+        assert symbol_table["any_name"] is None
+
+    def test_multiple_definitions_same_name(self):
+        """Test handling multiple definitions with the same name."""
+        symbol_table = SymbolTable()
+
+        # Add multiple definitions with the same name
+        def1 = create_mock_definition("duplicate_rule", line=1)
+        def2 = create_mock_definition("duplicate_rule", line=2)
+
+        symbol_table._register_definition(def1)
+        symbol_table._register_definition(def2)
+
+        # Should have both definitions
+        assert len(symbol_table.definitions["duplicate_rule"]) == 2
+        assert symbol_table.definitions["duplicate_rule"][0] is def1
+        assert symbol_table.definitions["duplicate_rule"][1] is def2
+
+        # get_definition should return the first one
+        assert symbol_table.get_definition("duplicate_rule") is def1
+
+    def test_cache_invalidation_scenarios(self):
+        """Test scenarios where caches should be properly managed."""
+        symbol_table = SymbolTable()
+
+        # First, populate and access caches
+        rule_def = create_mock_definition("rule", kind=Kind.RULE)
+        symbol_table._register_definition(rule_def)
+        reference = create_mock_reference("rule")
+        symbol_table._register_reference(reference)
+
+        # Access to populate caches
+        all_defs1 = symbol_table.get_all_definitions()
+        all_refs1 = symbol_table.get_all_references()
+
+        # Verify cache is used
+        all_defs2 = symbol_table.get_all_definitions()
+        all_refs2 = symbol_table.get_all_references()
+
+        assert all_defs1 is all_defs2
+        assert all_refs1 is all_refs2
