@@ -223,5 +223,8 @@ class Formatter:
         ]
         return "\n\n".join(formatted_nodes).strip()
 
+    def format_ast_node(self, node: AstNode, indent: str = DEFAULT_INDENT) -> str:
+        return _format_ast_node(node, indent=indent)
+
 
 FORMATTER = Formatter()

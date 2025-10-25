@@ -2,7 +2,7 @@ from typing import Optional, cast
 
 from lark import Token
 
-from lark_parser_language_server.symbol_table.flags import Kind, Modifiers
+from lark_parser_language_server.symbol_table.flags import Directives, Kind, Modifiers
 from lark_parser_language_server.symbol_table.symbol import Definition, Range, Reference
 from lark_parser_language_server.syntax_tree.nodes import (
     AstNode,
@@ -27,18 +27,24 @@ def definitions_from_declare(declare: Declare) -> list[Definition]:
             kind=Kind.RULE if symbol.type == "RULE" else Kind.TERMINAL,
             range=Range.from_meta(declare.meta),
             selection_range=Range.from_token(cast(Token, symbol)),
+            directives=Directives.DECLARED,
+            ast_node=declare,
         )
         for symbol in declare.symbols
     ]
 
 
-def definitions_from_expansions(expansions: list[Expansion]) -> list[Definition]:
+def definitions_from_expansions(
+    expansions: list[Expansion], container: Definition
+) -> list[Definition]:
     return [
         Definition(
             name=str(expansion.alias),
             kind=Kind.RULE,
             range=Range.from_meta(expansion.meta),
             selection_range=Range.from_token(expansion.alias),
+            ast_node=container.ast_node,
+            container=container,
         )
         for expansion in expansions
         if expansion.alias
@@ -52,6 +58,8 @@ def definitions_from_import(import_: Import) -> list[Definition]:
             kind=Kind.RULE if import_.alias.type == "RULE" else Kind.TERMINAL,
             range=Range.from_meta(import_.meta),
             selection_range=Range.from_token(import_.alias),
+            directives=Directives.IMPORTED,
+            ast_node=import_,
         )
 
         aliased_definitions = [
@@ -60,6 +68,8 @@ def definitions_from_import(import_: Import) -> list[Definition]:
                 kind=Kind.RULE if symbol.type == "RULE" else Kind.TERMINAL,
                 range=import_definition.range,
                 selection_range=Range.from_token(symbol),
+                directives=Directives.IMPORTED,
+                ast_node=import_,
             )
             for symbol in import_.symbols
         ]
@@ -75,6 +85,8 @@ def definitions_from_import(import_: Import) -> list[Definition]:
             kind=Kind.RULE if symbol.type == "RULE" else Kind.TERMINAL,
             range=Range.from_meta(import_.meta),
             selection_range=Range.from_token(symbol),
+            directives=Directives.IMPORTED,
+            ast_node=import_,
         )
         for symbol in import_.symbols
     ]
@@ -90,6 +102,7 @@ def definitions_from_rule_params(
             kind=Kind.RULE,
             range=parent.range,
             selection_range=Range.from_token(token),
+            ast_node=parent.ast_node,
         )
         for token in params
     ]
@@ -101,6 +114,7 @@ def definitions_from_rule(rule: Rule) -> list[Definition]:
         kind=Kind.RULE,
         range=Range.from_meta(rule.meta),
         selection_range=Range.from_token(rule.name),
+        ast_node=rule,
     )
 
     for parameter_definition in definitions_from_rule_params(
@@ -113,7 +127,10 @@ def definitions_from_rule(rule: Rule) -> list[Definition]:
 
     return [
         rule_definition,
-        *definitions_from_expansions(rule.expansions),
+        *definitions_from_expansions(
+            rule.expansions,
+            container=rule_definition,
+        ),
     ]
 
 
@@ -123,6 +140,7 @@ def definitions_from_term(term: Term) -> list[Definition]:
         kind=Kind.TERMINAL,
         range=Range.from_meta(term.meta),
         selection_range=Range.from_token(term.name),
+        ast_node=term,
     )
 
     for modifier in term.modifiers:
@@ -130,7 +148,10 @@ def definitions_from_term(term: Term) -> list[Definition]:
 
     return [
         term_definition,
-        *definitions_from_expansions(term.expansions),
+        *definitions_from_expansions(
+            term.expansions,
+            container=term_definition,
+        ),
     ]
 
 
