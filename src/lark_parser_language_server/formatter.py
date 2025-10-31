@@ -186,9 +186,7 @@ def _format_term(  # pylint: disable=unused-argument
     return f"{modifiers}{name}{priority}: {expansions}"
 
 
-def _format_ast_node(
-    node: AstNode, indent: str = DEFAULT_INDENT, level: int = 1
-) -> str:
+def _format_ast_node(node: Any, indent: str = DEFAULT_INDENT, level: int = 1) -> str:
     formatter_map: dict[Any, Callable[[Any, str, int], str]] = {
         Comment: _format_comment,
         Declare: _format_declare,
