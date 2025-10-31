@@ -66,12 +66,26 @@ class TestSymbolTable:
         """Test SymbolTable initialization."""
         symbol_table = SymbolTable()
 
-        assert symbol_table.definitions == {}
-        assert symbol_table.references == {}
-        assert symbol_table.definition_errors == []
-        assert symbol_table.reference_errors == []
-        assert symbol_table._all_references == []
-        assert symbol_table._all_definitions == []
+        assert (
+            isinstance(symbol_table.definitions, dict) and not symbol_table.definitions
+        )
+        assert isinstance(symbol_table.references, dict) and not symbol_table.references
+        assert (
+            isinstance(symbol_table.definition_errors, list)
+            and not symbol_table.definition_errors
+        )
+        assert (
+            isinstance(symbol_table.reference_errors, list)
+            and not symbol_table.reference_errors
+        )
+        assert (
+            isinstance(symbol_table._all_references, list)
+            and not symbol_table._all_references
+        )
+        assert (
+            isinstance(symbol_table._all_definitions, list)
+            and not symbol_table._all_definitions
+        )
 
     def test_getitem(self):
         """Test __getitem__ method."""

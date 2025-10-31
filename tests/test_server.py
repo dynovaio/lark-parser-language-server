@@ -50,6 +50,9 @@ from lark_parser_language_server.version import VERSION
 class TestLarkLanguageServer:
     """Test cases for LarkLanguageServer class."""
 
+    server: LarkLanguageServer
+    test_uri: str
+
     def setup_method(self):
         """Set up test fixtures."""
         self.server = LarkLanguageServer()
@@ -99,7 +102,7 @@ class TestLarkLanguageServer:
         mock_decorator = Mock()
         mock_feature.return_value = mock_decorator
 
-        server = LarkLanguageServer()
+        _ = LarkLanguageServer()
 
         # Should have called feature() for each feature
         assert mock_feature.call_count == 9  # Number of features
@@ -1205,7 +1208,7 @@ class TestLarkLanguageServerIntegration:
             text_document=TextDocumentIdentifier(uri=uri),
             position=Position(line=2, character=8),  # On "expr"
         )
-        hover_result = hover_handler(hover_params)
+        _ = hover_handler(hover_params)
         # hover_result might be None, which is fine
 
         # Test formatting
@@ -1291,7 +1294,7 @@ class TestLarkLanguageServerIntegration:
             )
         )
 
-        hover_result = hover_handler(
+        _ = hover_handler(
             HoverParams(
                 text_document=TextDocumentIdentifier(uri=uri),
                 position=Position(line=0, character=0),

@@ -10,7 +10,6 @@ from lark_parser_language_server.symbol_table.errors import (
     MultipleDefinitionsError,
     ShadowedDefinitionError,
 )
-from lark_parser_language_server.symbol_table.flags import Kind
 from lark_parser_language_server.symbol_table.symbol import (
     Definition,
     Position,
