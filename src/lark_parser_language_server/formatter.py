@@ -133,7 +133,7 @@ def _format_range(  # pylint: disable=unused-argument
     indent: str = DEFAULT_INDENT,
     level: int = 1,
 ) -> str:
-    return f"{range_.start}..{range_.end}"
+    return f'"{range_.start}".."{range_.end}"'
 
 
 def _format_rule(  # pylint: disable=unused-argument
