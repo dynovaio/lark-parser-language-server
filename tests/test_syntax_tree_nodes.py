@@ -2,7 +2,6 @@
 
 from unittest.mock import Mock, patch
 
-import pytest
 from lark import Token, Tree
 from lark.tree import Meta
 
@@ -297,8 +296,8 @@ class TestTerm:
         term = Term(tree)
         assert term.name is name_token
         assert term.priority == 0
-        assert term.expansions == []
-        assert term.modifiers == []
+        assert isinstance(term.modifiers, list) and not term.expansions
+        assert isinstance(term.modifiers, list) and not term.modifiers
 
     def test_term_creation_with_priority(self):
         """Test Term creation with priority."""

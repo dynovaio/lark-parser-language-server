@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional
 from unittest.mock import Mock, patch
 
-import pytest
 from lark import Lark
 
 from lark_parser_language_server.parser import PARSER, _get_parser
@@ -134,7 +133,7 @@ class TestParser:
         mock_path.return_value = mock_path_instance
 
         # Call _get_parser to trigger file reading
-        with patch("lark_parser_language_server.parser.Lark") as mock_lark:
+        with patch("lark_parser_language_server.parser.Lark") as _:
             _get_parser()
 
         # Verify the correct file path was constructed

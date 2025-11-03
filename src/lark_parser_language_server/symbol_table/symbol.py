@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from textwrap import dedent
 from typing import Optional
 
 from lark import Token, Tree
@@ -17,6 +18,7 @@ from lsprotocol.types import Position as LspPosition
 from lsprotocol.types import Range as LspRange
 from lsprotocol.types import SymbolKind
 
+from lark_parser_language_server.formatter import FORMATTER
 from lark_parser_language_server.symbol_table.flags import Directives, Kind, Modifiers
 from lark_parser_language_server.syntax_tree.nodes import AstNode
 
@@ -145,6 +147,9 @@ class Definition:
     directives: Directives = Directives(0)
     modifiers: Modifiers = Modifiers(0)
 
+    ast_node: Optional[AstNode] = None
+    container: Optional["Definition"] = None
+
     def __post_init__(self):
         if self.children is None:
             self.children = {}
@@ -170,11 +175,37 @@ class Definition:
 
     @property
     def documentation(self) -> str:
-        return (
+        definition = "No definition available."
+
+        if self.ast_node:
+            definition = dedent(
+                "\n".join(["```lark", FORMATTER.format_ast_node(self.ast_node), "```"])
+            ).strip()
+
+        summary = (
             f"Grammar rule: {self.name}"
             if self.kind == Kind.RULE
             else f"Grammar terminal: {self.name}"
         )
+
+        detail_predicates = [
+            (
+                f"* Imported from `{getattr(self.ast_node, 'path')}`"
+                if self.directives & Directives.IMPORTED and self.ast_node
+                else ""
+            ),
+            "* Declared." if self.directives & Directives.DECLARED else "",
+            (
+                "* Conditionally inlined."
+                if self.modifiers & Modifiers.CONDITIONALLY_INLINED
+                else ""
+            ),
+            "* Inlined." if self.modifiers & Modifiers.INLINED else "",
+            "* Pinned." if self.modifiers & Modifiers.PINNED else "",
+        ]
+        detail = "\n".join([line for line in detail_predicates if line])
+
+        return "\n\n".join([definition, "---", summary, "---", detail])
 
     def append_child(self, child: "Definition") -> None:
         if self.children is None:
@@ -225,7 +256,7 @@ class Definition:
 
         return Hover(
             contents=MarkupContent(
-                kind=MarkupKind.PlainText,
+                kind=MarkupKind.Markdown,
                 value=self.documentation,
             ),
             range=range_,

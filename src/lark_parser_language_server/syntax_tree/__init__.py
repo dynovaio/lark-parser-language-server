@@ -66,18 +66,6 @@ class AstBuilder(Transformer):
         items = tree.children
         return items[0]
 
-    def RULE(self, s):
-        return s
-
-    def TERMINAL(self, s):
-        return s
-
-    def STRING(self, s):
-        return s.value[1:-1]
-
-    def REGEXP(self, s):
-        return s
-
     def start(self, tree):
         return Ast(tree=tree)
 

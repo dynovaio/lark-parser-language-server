@@ -1,10 +1,8 @@
 """Tests for lark_parser_language_server/syntax_tree/__init__.py module."""
 
-from functools import partial
 from unittest.mock import Mock, patch
 
-import pytest
-from lark import Transformer, Tree, ast_utils, v_args
+from lark import Transformer, Tree
 
 from lark_parser_language_server.syntax_tree import (
     AST_BUILDER,
@@ -193,43 +191,6 @@ class TestAstBuilder:
         result = builder.terminal(tree)
         assert result is item
 
-    def test_ast_builder_rule(self):
-        """Test RULE method."""
-        builder = AstBuilder()
-
-        token = Mock()
-        result = builder.RULE(token)
-
-        assert result is token
-
-    def test_ast_builder_terminal_token(self):
-        """Test TERMINAL method."""
-        builder = AstBuilder()
-
-        token = Mock()
-        result = builder.TERMINAL(token)
-
-        assert result is token
-
-    def test_ast_builder_string(self):
-        """Test STRING method."""
-        builder = AstBuilder()
-
-        string_token = Mock()
-        string_token.value = '"test string"'
-
-        result = builder.STRING(string_token)
-        assert result == "test string"
-
-    def test_ast_builder_regexp(self):
-        """Test REGEXP method."""
-        builder = AstBuilder()
-
-        regexp_token = Mock()
-        result = builder.REGEXP(regexp_token)
-
-        assert result is regexp_token
-
     def test_ast_builder_start(self):
         """Test start method."""
         builder = AstBuilder()
@@ -300,7 +261,7 @@ class TestSyntaxTree:
 
         # Verify create_transformer was called
         assert mock_create_transformer.called
-        args, kwargs = mock_create_transformer.call_args
+        _, kwargs = mock_create_transformer.call_args
 
         # Check that the decorator_factory argument uses partial with v_args
         assert "decorator_factory" in kwargs
@@ -365,7 +326,7 @@ class TestSyntaxTree:
         _get_ast_builder()
 
         # Verify create_transformer was called with the correct module
-        args, kwargs = mock_create_transformer.call_args
+        args, _ = mock_create_transformer.call_args
         assert len(args) >= 2  # Should have module and base_transformer arguments
 
         # The first argument should be the ast_nodes_module

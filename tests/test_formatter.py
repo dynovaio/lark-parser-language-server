@@ -2,7 +2,6 @@
 
 from unittest.mock import Mock, patch
 
-import pytest
 from lark import Token
 
 from lark_parser_language_server.formatter import (
@@ -444,11 +443,11 @@ class TestFormatRange:
     def test_format_range(self):
         """Test formatting range."""
         range_ = Mock(spec=Range)
-        range_.start = "a"
-        range_.end = "z"
+        range_.start = '"a"'
+        range_.end = '"z"'
 
         result = _format_range(range_)
-        assert result == "a..z"
+        assert result == '"a".."z"'
 
 
 class TestFormatRule:
@@ -716,9 +715,6 @@ class TestFormatAstNode:
 
     def test_format_ast_node_comment(self):
         """Test formatting AST node with Comment type."""
-        # Test the comment formatter directly instead of through the dispatcher
-        from lark_parser_language_server.formatter import _format_comment
-
         comment = Mock()
         comment.content = "test comment"
 
@@ -770,9 +766,6 @@ class TestFormatAstNode:
 
     def test_format_ast_node_all_types(self):
         """Test that all node types have formatters in the map."""
-        # Test that the formatter map contains all expected types
-        from lark_parser_language_server.formatter import _format_comment
-
         # Test Comment formatter directly
         comment = Mock()
         comment.content = "test"

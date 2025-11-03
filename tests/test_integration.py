@@ -278,8 +278,3 @@ class TestLarkLanguageServerIntegration:
         assert len(completions) > 0
         assert len(symbols) > 0
         assert isinstance(refs_number, list)
-
-        # Should have rules and terminals in symbols
-        rule_symbols = [s for s in symbols if hasattr(s, "kind")]
-        # Just verify we have some symbols, regardless of their specific kind names
-        assert len(symbols) > 0

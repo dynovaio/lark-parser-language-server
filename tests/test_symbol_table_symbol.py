@@ -1,22 +1,16 @@
 """Tests for lark_parser_language_server.symbol_table.symbol module."""
 
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 from lark import Token, Tree
 from lark.tree import Meta
-from lsprotocol.types import (
-    CompletionItemKind,
-    DocumentSymbol,
-    Hover,
-    Location,
-    MarkupContent,
-    MarkupKind,
-)
+from lsprotocol.types import CompletionItemKind, DocumentSymbol, Location
 from lsprotocol.types import Position as LspPosition
 from lsprotocol.types import Range as LspRange
 from lsprotocol.types import SymbolKind
 
+from lark_parser_language_server.formatter import FORMATTER
 from lark_parser_language_server.symbol_table.flags import Directives, Kind, Modifiers
 from lark_parser_language_server.symbol_table.symbol import (
     KEYWORDS,
@@ -294,7 +288,7 @@ class TestRange:
         range_obj = Range(start=start, end=end)
 
         with pytest.raises(TypeError, match="Unsupported type for containment check"):
-            "invalid" in range_obj
+            _ = "invalid" in range_obj
 
     def test_range_to_lsp_range(self):
         """Test Range.to_lsp_range conversion."""
@@ -489,33 +483,64 @@ class TestDefinition:
 
     def test_definition_documentation_rule(self):
         """Test Definition.documentation property for rule."""
-        start = Position(line=1, column=5)
-        end = Position(line=1, column=15)
-        range_obj = Range(start=start, end=end)
+        FORMATTER.format_ast_node = Mock(return_value="test_rule")
+
+        mock_range = Mock(spec=Range)
+        mock_range.to_lsp_range.return_value = LspRange(
+            start=LspPosition(line=1, character=2),
+            end=LspPosition(line=3, character=4),
+        )
 
         definition = Definition(
             name="test_rule",
             kind=Kind.RULE,
-            range=range_obj,
-            selection_range=range_obj,
+            range=mock_range,
+            selection_range=Mock(),
+            ast_node=Mock(),
         )
 
-        assert definition.documentation == "Grammar rule: test_rule"
+        hover = definition.to_lsp_hover_info()
+
+        expected_documentation = """```lark
+test_rule
+```
+
+---
+
+Grammar rule: test_rule
+
+---
+
+"""
+        assert hover.contents.value == expected_documentation
+        assert hover.range.start.line == 1
+        assert hover.range.start.character == 2
+        assert hover.range.end.line == 3
+        assert hover.range.end.character == 4
 
     def test_definition_documentation_terminal(self):
         """Test Definition.documentation property for terminal."""
-        start = Position(line=1, column=5)
-        end = Position(line=1, column=15)
-        range_obj = Range(start=start, end=end)
-
+        FORMATTER.format_ast_node = Mock(return_value="TEST_TERMINAL")
         definition = Definition(
             name="TEST_TERMINAL",
             kind=Kind.TERMINAL,
-            range=range_obj,
-            selection_range=range_obj,
+            range=Mock(),
+            selection_range=Mock(),
+            ast_node=Mock(),
         )
 
-        assert definition.documentation == "Grammar terminal: TEST_TERMINAL"
+        expected_documentation = """```lark
+TEST_TERMINAL
+```
+
+---
+
+Grammar terminal: TEST_TERMINAL
+
+---
+
+"""
+        assert definition.documentation == expected_documentation
 
     def test_definition_append_child_new_name(self):
         """Test Definition.append_child with new child name."""
@@ -701,23 +726,39 @@ class TestDefinition:
 
     def test_definition_to_lsp_hover_info_default_range(self):
         """Test Definition.to_lsp_hover_info with default range."""
-        start = Position(line=1, column=5)
-        end = Position(line=1, column=15)
-        range_obj = Range(start=start, end=end)
+        FORMATTER.format_ast_node = Mock(return_value="test_rule")
+
+        mock_range = Mock(spec=Range)
+        mock_range.to_lsp_range.return_value = LspRange(
+            start=LspPosition(line=1, character=2),
+            end=LspPosition(line=3, character=4),
+        )
 
         definition = Definition(
             name="test_rule",
             kind=Kind.RULE,
-            range=range_obj,
-            selection_range=range_obj,
+            range=mock_range,
+            selection_range=Mock(),
+            ast_node=Mock(),
         )
 
         hover = definition.to_lsp_hover_info()
 
-        assert isinstance(hover, Hover)
-        assert hover.contents.value == "Grammar rule: test_rule"
+        expected_documentation = """```lark
+test_rule
+```
+
+---
+
+Grammar rule: test_rule
+
+---
+
+"""
+
+        assert hover.contents.value == expected_documentation
         assert hover.range.start.line == 1
-        assert hover.range.start.character == 5
+        assert hover.range.start.character == 2
 
     def test_definition_to_lsp_hover_info_custom_range(self):
         """Test Definition.to_lsp_hover_info with custom Range."""
@@ -838,9 +879,9 @@ class TestReference:
         assert reference.name == "TEST_TERMINAL"
         assert reference.kind == Kind.TERMINAL
         assert reference.position.line == 2  # 0-based
-        assert (
-            reference.position.column == 6
-        )  # 0-based    def test_reference_from_token_with_ast_node(self):
+        assert reference.position.column == 6  # 0-based
+
+    def test_reference_from_token_with_ast_node(self):
         """Test Reference.from_token with AST node."""
         token = Mock(spec=Token)
         token.value = "test_rule"

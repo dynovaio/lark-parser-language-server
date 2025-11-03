@@ -2,12 +2,11 @@
 
 from unittest.mock import Mock
 
-import pytest
 from lark import Token
 from lark.tree import Meta
 
 from lark_parser_language_server.symbol_table.flags import Kind, Modifiers
-from lark_parser_language_server.symbol_table.symbol import Definition, Reference
+from lark_parser_language_server.symbol_table.symbol import Definition
 from lark_parser_language_server.symbol_table.syntax_tree import (
     definitions_from_ast_node,
     definitions_from_declare,
@@ -179,7 +178,9 @@ class TestDefinitionsFromExpansions:
         expansion2.meta = create_mock_meta(2, 1, 2, 10)
 
         expansions = [expansion1, expansion2]
-        definitions = definitions_from_expansions(expansions)
+        container = Mock(spec=Definition)
+        container.ast_node = None
+        definitions = definitions_from_expansions(expansions, container)
 
         assert len(definitions) == 2
         assert definitions[0].name == "alias_one"
@@ -196,9 +197,10 @@ class TestDefinitionsFromExpansions:
         expansion2 = Mock(spec=Expansion)
         expansion2.alias = None
         expansion2.meta = create_mock_meta()
-
         expansions = [expansion1, expansion2]
-        definitions = definitions_from_expansions(expansions)
+        container = Mock(spec=Definition)
+        container.ast_node = None
+        definitions = definitions_from_expansions(expansions, container)
 
         assert len(definitions) == 0
 
@@ -217,7 +219,9 @@ class TestDefinitionsFromExpansions:
         expansion3.meta = create_mock_meta(3, 1, 3, 10)
 
         expansions = [expansion1, expansion2, expansion3]
-        definitions = definitions_from_expansions(expansions)
+        container = Mock(spec=Definition)
+        container.ast_node = None
+        definitions = definitions_from_expansions(expansions, container)
 
         assert len(definitions) == 2
         assert definitions[0].name == "alias_one"
@@ -225,7 +229,9 @@ class TestDefinitionsFromExpansions:
 
     def test_definitions_from_expansions_empty_list(self):
         """Test extracting definitions from empty expansions list."""
-        definitions = definitions_from_expansions([])
+        container = Mock(spec=Definition)
+        container.ast_node = None
+        definitions = definitions_from_expansions([], container)
         assert len(definitions) == 0
 
 
@@ -1242,7 +1248,9 @@ class TestModuleIntegration:
         assert references_from_declare(Mock(symbols=[], meta=create_mock_meta())) == []
 
         # Test empty expansions
-        assert definitions_from_expansions([]) == []
+        container = Mock(spec=Definition)
+        container.ast_node = None
+        assert definitions_from_expansions([], container) == []
 
         # Test empty parameters
         parent = Mock(range=Mock())
@@ -1265,7 +1273,9 @@ class TestModuleIntegration:
         expansion.expressions = []
         expansion.meta = create_mock_meta()
 
-        assert definitions_from_expansions([expansion]) == []
+        container = Mock(spec=Definition)
+        container.ast_node = None
+        assert definitions_from_expansions([expansion], container) == []
         assert references_from_expansion(expansion) == []
 
     def test_modifier_accumulation(self):
