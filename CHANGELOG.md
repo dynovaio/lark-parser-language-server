@@ -2,7 +2,47 @@
 
 ## [Unreleased]
 
-## [0.3.0] - 2025-10-22
+### Enhanced LSP Features
+
+* **Improved Hover Documentation**
+  * Added rich markdown documentation for grammar rules and terminals
+  * Enhanced symbol details with import paths, modifiers, and declaration status
+  * Added syntax-highlighted grammar rule definitions in hover tooltips
+  * Better formatting and organization of hover information
+  * Enhanced container and parent-child relationship display
+
+* **Document Formatting**
+  * Fixed formatting issues with string ranges and case-insensitive modifiers
+  * Enhanced formatting of grammar nodes with better type handling
+  * Fixed range formatting edge cases
+  * Relaxed type annotations for improved flexibility
+
+### Quality Improvements
+
+* **Test Suite Enhancements**
+  * Fixed and optimized syntax tree tests
+  * Enhanced symbol table tests with better coverage
+  * Improved test organization and readability
+  * Added more edge case testing
+  * Fixed lint errors across test suite:
+    * Integration tests cleanup
+    * Parser test improvements
+    * Server test refinements
+    * Symbol table test enhancements
+
+* **Code Quality**
+  * Enhanced type safety with better annotations
+  * Improved error handling and edge cases
+  * Cleaner code organization
+
+### Bug Fixes
+
+* Fixed formatting issues with LString ranges
+* Fixed string case-insensitive modifier handling
+* Fixed formatting edge cases in various grammar constructs
+* Improved boundary condition handling
+
+## [0.3.0] - 2025-10-24
 
 ### Major Architecture & Infrastructure Improvements
 
