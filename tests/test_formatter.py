@@ -443,8 +443,8 @@ class TestFormatRange:
     def test_format_range(self):
         """Test formatting range."""
         range_ = Mock(spec=Range)
-        range_.start = "a"
-        range_.end = "z"
+        range_.start = '"a"'
+        range_.end = '"z"'
 
         result = _format_range(range_)
         assert result == '"a".."z"'
