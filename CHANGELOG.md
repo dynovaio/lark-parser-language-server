@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-11-03
+
 ### Enhanced LSP Features
 
 * **Improved Hover Documentation**
