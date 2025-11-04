@@ -48,10 +48,10 @@ Run the language server
 
 ```bash
 # Run the server
-python -m lark_language_server
+lark-language-server
 
 # Run with TCP (for debugging)
-python -m lark_language_server --tcp --host 127.0.0.1 --port 2087
+lark-language-server --tcp --host 127.0.0.1 --port 2087
 ```
 
 ## Docs

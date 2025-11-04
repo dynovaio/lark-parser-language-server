@@ -55,6 +55,9 @@ Download = "https://github.com/dynovaio/lark-parser-language-server/archive/refs
 Changelog = "https://github.com/dynovaio/lark-parser-language-server/blob/master/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/dynovaio/lark-parser-language-server/issues"
 
+[project.scripts]
+lark-language-server = "lark_parser_language_server.__main__:main"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
