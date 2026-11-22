@@ -15,6 +15,7 @@ from lsprotocol.types import (
     Range,
     TextEdit,
 )
+from pygls.uris import to_fs_path
 
 from lark_parser_language_server.formatter import FORMATTER
 from lark_parser_language_server.parser import PARSER
@@ -76,14 +77,27 @@ class LarkDocument:
         return _on_parse_error
 
     def _load_document_grammar(self) -> None:
-        # There are some error that are not caught during parsing,
-        # but they are caught during grammar loading using Lark's internal
-        # mechanisms with Lark class.
+        source_path = to_fs_path(self.uri)
+
+        kwargs: Dict[str, str] = {}
+
+        if source_path is not None:
+            kwargs["source_path"] = source_path
+        else:
+            logger.warning(
+                "Could not resolve filesystem path for document %s. "
+                "Relative grammar imports may not work.",
+                self.uri,
+            )
+
+        # Lark's grammar loader performs additional validation that is not
+        # covered by the document parser, including import resolution.
+        # source_path must be a filesystem path for relative imports to work.
         Lark(
             self.source,
             parser="lalr",
             start="start",
-            source_path=str(self.uri),
+            **kwargs,
         )
 
     def _parse_grammar(self) -> None:
